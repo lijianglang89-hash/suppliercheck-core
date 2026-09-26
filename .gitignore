@@ -59,3 +59,6 @@ next-env.d.ts
 
 # agent scratch
 /tmp/
+
+# WorkBuddy 本地项目数据（工作日志、会话摘要等），不入库
+/.workbuddy/
