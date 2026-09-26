@@ -38,6 +38,11 @@
   --color-ink-900: #161a21;
 
   /* 语义色 */
+  /* 浅蓝产品展示区底色：用于放产品 UI 的区块，让白卡片从页面里浮起来 */
+  --color-brand-tint: #edf4fa;
+  /* 更浅的蓝灰：用于文件卡、流程节点的底 */
+  --color-brand-mist: #f2f6f9;
+
   --color-success-600: #1f7a4d;
   --color-warning-600: #a35a06;
   --color-danger-600: #b3261e;

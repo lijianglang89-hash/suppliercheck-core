@@ -1,66 +1,25 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { FileStack, FlowArrow, ResultPanel } from "@/components/landing/visuals";
+import { ReportSection } from "@/components/landing/report-section";
+import {
+  BeforeAfterSection,
+  CapabilitiesSection,
+  FinalCtaSection,
+  MetricsSection,
+  SecuritySection,
+  WorkflowSection,
+} from "@/components/landing/sections";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { getSiteUrl, siteConfig } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: `${siteConfig.name} · ${siteConfig.tagline}`,
+  title: `${siteConfig.shortName}｜${siteConfig.name}`,
   description: siteConfig.description,
   alternates: { canonical: "/" },
 };
-
-/** 产品能力。只写产品「设计上要做的事」，不写任何未验证的效果数字。 */
-const CAPABILITIES: ReadonlyArray<{ title: string; detail: string }> = [
-  {
-    title: "文件识别",
-    detail: "自动识别供应商资料包中的文件类型，涵盖 PDF、Word、Excel、图片与压缩包。",
-  },
-  {
-    title: "关键信息提取",
-    detail: "从各类资料中提取企业名称、统一社会信用代码、证照编号、有效期等关键字段。",
-  },
-  {
-    title: "资料完整性检查",
-    detail: "对照审核模板逐项检查资料是否齐全，直接列出缺什么。",
-  },
-  {
-    title: "证照有效期核验",
-    detail: "检查营业执照、资质证书等是否仍在有效期内，对临期证照提前预警。",
-  },
-  {
-    title: "主体信息一致性核对",
-    detail: "比对不同文件中的企业名称、统一社会信用代码等主体信息是否自洽。",
-  },
-  {
-    title: "审核报告输出",
-    detail: "把发现的问题汇总成结构化审核报告，便于内部评审与归档。",
-  },
-];
-
-const WORKFLOW: ReadonlyArray<{ step: string; title: string; detail: string }> = [
-  {
-    step: "01",
-    title: "上传资料包",
-    detail: "把供应商提供的证照、资质、产品资料打包上传，无需手工整理。",
-  },
-  {
-    step: "02",
-    title: "自动识别与提取",
-    detail: "系统识别文件类型并提取关键信息，人工只需要核对结果。",
-  },
-  {
-    step: "03",
-    title: "规则校验与一致性核对",
-    detail: "按审核模板检查完整性、有效期与主体信息一致性，标记异常项。",
-  },
-  {
-    step: "04",
-    title: "输出审核报告",
-    detail: "生成可交付的审核报告，附问题清单，支持后续人工复核。",
-  },
-];
 
 const FAQS: ReadonlyArray<{ question: string; answer: string }> = [
   {
@@ -74,8 +33,14 @@ const FAQS: ReadonlyArray<{ question: string; answer: string }> = [
       "已支持 PDF、Word（DOCX）、Excel（XLSX）、图片（PNG / JPG）以及 ZIP 压缩包：上传后自动提取正文，再交给审核引擎逐条核对。",
   },
   {
-    question: "需要安装软件吗？",
-    answer: "不需要。供应商智审是浏览器访问的在线服务，采购人员、供应链人员和供应商协作方都可以直接使用。",
+    question: "审核结论是怎么得出的？",
+    answer:
+      "由 15 条确定性规则逐条核对得出，每条发现都标注规则、所在文件与原文摘录。同一份资料跑两次结果一致。当前未启用模型复核，因此不会出现无法复算的判断。",
+  },
+  {
+    question: "系统会替我判断供应商是否合格吗？",
+    answer:
+      "不会。系统只负责找出可疑点并给出证据，是否合格由审核员决定。涉及资质挂靠、母子公司协同这类情况，系统会提示人工核实而不下结论。",
   },
   {
     question: "上传的供应商资料安全吗？",
@@ -88,6 +53,19 @@ const FAQS: ReadonlyArray<{ question: string; answer: string }> = [
       "可以。当前版本已可跑完整链路：上传 → 解析 → 规则审核 → 报告。审核结论由 15 条确定性规则产出（可复算、可追溯），不是模型猜测。正式定价尚未公布。",
   },
 ];
+
+const HERO_FILES = [
+  { name: "营业执照", ext: "pdf" },
+  { name: "ISO9001 证书", ext: "pdf" },
+  { name: "检测报告", ext: "pdf" },
+  { name: "报价单", ext: "xlsx" },
+] as const;
+
+const HERO_ROWS = [
+  { label: "ISO9001 证书", status: "warn", note: "42 天后到期" },
+  { label: "开户资料", status: "warn", note: "主体名称不一致" },
+  { label: "检测报告", status: "fail", note: "资料包中未找到" },
+] as const;
 
 export default function HomePage() {
   const siteUrl = getSiteUrl();
@@ -131,103 +109,107 @@ export default function HomePage() {
       <SiteHeader />
 
       <main id="main" className="flex-1">
-        {/* Hero：一句话价值主张 + 主 CTA */}
+        {/*
+          Hero：左文右产品视觉。
+          右侧刻意放"文件 → 核对 → 结果"这条链，而不是概念插画或图库照片 ——
+          这个产品最有力的证据就是它自己的界面（见 docs/DESIGN.md §4）。
+        */}
         <section className="border-b border-ink-200 bg-white">
-          <div className="mx-auto w-full max-w-6xl px-6 py-20 lg:py-24">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-600">
-              {siteConfig.latinName}
-            </p>
-            <h1 className="mt-4 max-w-3xl text-4xl font-semibold leading-tight tracking-tight text-ink-900 lg:text-5xl">
-              {siteConfig.tagline}
-            </h1>
-            <p className="mt-6 max-w-2xl text-base leading-7 text-ink-600">
-              面向企业采购、供应链与中小企业的供应商资料审核工具。把散落在压缩包里的营业执照、资质证书和产品资料，
-              整理成一份可逐条追溯的审核报告。
-            </p>
+          <div className="mx-auto w-full max-w-6xl px-6 py-16 lg:py-24">
+            <div className="grid items-center gap-12 lg:grid-cols-2">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-600">
+                  {siteConfig.latinName}
+                </p>
+                {/*
+                  标题刻意不写「交给 AI」。
+                  审核结论由 15 条确定性规则产出，不是模型判断 ——
+                  写成 AI 就是把规则包装成它自己不是的东西（docs/DESIGN.md §0 硬规则 1）。
+                  「不用再逐份翻文件」说的是真实痛点，也是系统真能办到的事。
+                */}
+                <h1 className="mt-4 text-4xl font-semibold leading-tight tracking-tight text-ink-900 lg:text-5xl">
+                  供应商资料审核，
+                  <br className="hidden sm:block" />
+                  不用再逐份翻文件
+                </h1>
+                <p className="mt-6 text-base leading-7 text-ink-600">
+                  上传营业执照、认证证书、检测报告、报价单等资料，自动发现缺失、过期和信息不一致问题，
+                  输出一份可逐条追溯的审核报告。
+                </p>
 
-            <div className="mt-9 flex flex-wrap items-center gap-3">
-              <Link
-                href="/register"
-                className="rounded-md bg-brand-700 px-6 py-3 text-sm font-medium text-white hover:bg-brand-800"
-              >
-                免费体验
-              </Link>
-              <Link
-                href="/login"
-                className="rounded-md border border-ink-300 bg-white px-6 py-3 text-sm font-medium text-ink-700 hover:bg-ink-50"
-              >
-                已有账号，登录
-              </Link>
+                <div className="mt-9 flex flex-wrap items-center gap-3">
+                  <Link
+                    href="/register"
+                    className="rounded-md bg-brand-700 px-6 py-3 text-sm font-medium text-white hover:bg-brand-800"
+                  >
+                    免费开始审核
+                  </Link>
+                  <Link
+                    href="/login"
+                    className="rounded-md border border-ink-300 bg-white px-6 py-3 text-sm font-medium text-ink-700 hover:bg-ink-50"
+                  >
+                    已有账号，登录
+                  </Link>
+                </div>
+
+                <p className="mt-5 text-xs text-ink-500">
+                  V0.3 · 15 条审核规则已上线，可跑完整审核并输出报告；模型复核尚未启用
+                </p>
+              </div>
+
+              <div className="rounded-lg border border-ink-200 bg-brand-mist p-5">
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="text-sm font-semibold text-ink-900">资料包</p>
+                  <span className="rounded bg-white px-1.5 py-0.5 text-[11px] text-ink-500">
+                    示例数据
+                  </span>
+                </div>
+                <div className="mt-3">
+                  <FileStack files={HERO_FILES} />
+                </div>
+                <FlowArrow />
+                <p className="mb-2 text-center text-[11px] text-ink-400">15 条规则逐条核对</p>
+                <ResultPanel summary={{ pass: 14, warn: 3, fail: 1 }} rows={HERO_ROWS} />
+              </div>
             </div>
-
-            {/*
-              这一行是**能力边界声明**，不是免责模板。
-              曾经这里写的是"V0.1 开发版本 · AI 审核能力开发中" —— 那是当时的实情，
-              但规则引擎上线后没同步，于是首页在把一个已经能用的功能说成不能用。
-              反过来夸大一样是错：审核结论由确定性规则产出，不是模型判断，
-              所以这里写"规则审核"，不写"AI 审核"。
-            */}
-            <p className="mt-5 text-xs text-ink-500">
-              当前为 V0.3 · 15 条审核规则已上线，可跑完整审核并输出报告；模型复核尚未启用
-            </p>
           </div>
         </section>
 
-        {/* 产品能力 */}
-        <section aria-labelledby="capabilities-heading" className="border-b border-ink-200">
-          <div className="mx-auto w-full max-w-6xl px-6 py-16 lg:py-20">
-            <h2 id="capabilities-heading" className="text-2xl font-semibold tracking-tight text-ink-900">
-              一次上传，审完这几件事
-            </h2>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-ink-600">
-              供应商资料审核中最耗时、最容易出错的判断，交给系统先做一遍。
-            </p>
+        <MetricsSection />
+        <BeforeAfterSection />
+        <ReportSection />
+        <CapabilitiesSection />
+        <WorkflowSection />
+        <SecuritySection />
 
-            <ul className="mt-10 grid gap-x-10 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
-              {CAPABILITIES.map((item) => (
-                <li key={item.title} className="border-t border-ink-200 pt-5">
-                  <h3 className="text-base font-semibold text-ink-900">{item.title}</h3>
-                  <p className="mt-2 text-sm leading-6 text-ink-600">{item.detail}</p>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </section>
-
-        {/* 工作流程 */}
-        <section aria-labelledby="workflow-heading" className="border-b border-ink-200 bg-white">
-          <div className="mx-auto w-full max-w-6xl px-6 py-16 lg:py-20">
-            <h2 id="workflow-heading" className="text-2xl font-semibold tracking-tight text-ink-900">
-              审核流程
-            </h2>
-            <ol className="mt-10 grid gap-x-10 gap-y-8 sm:grid-cols-2 lg:grid-cols-4">
-              {WORKFLOW.map((item) => (
-                <li key={item.step}>
-                  <span className="font-mono text-sm font-semibold text-brand-500">{item.step}</span>
-                  <h3 className="mt-3 text-base font-semibold text-ink-900">{item.title}</h3>
-                  <p className="mt-2 text-sm leading-6 text-ink-600">{item.detail}</p>
-                </li>
-              ))}
-            </ol>
-          </div>
-        </section>
-
-        {/* FAQ：静态渲染，非客户端状态，确保可被搜索引擎抓取 */}
-        <section aria-labelledby="faq-heading" className="border-b border-ink-200">
+        {/* FAQ：用 <details> 折叠，内容仍在 HTML 里，不损害 SEO 与 GEO。 */}
+        <section aria-labelledby="faq-heading" className="bg-white">
           <div className="mx-auto w-full max-w-3xl px-6 py-16 lg:py-20">
             <h2 id="faq-heading" className="text-2xl font-semibold tracking-tight text-ink-900">
               常见问题
             </h2>
-            <dl className="mt-10 space-y-8">
+            <div className="mt-8 divide-y divide-ink-200 border-y border-ink-200">
               {FAQS.map((item) => (
-                <div key={item.question}>
-                  <dt className="text-base font-semibold text-ink-900">{item.question}</dt>
-                  <dd className="mt-2 text-sm leading-6 text-ink-600">{item.answer}</dd>
-                </div>
+                <details key={item.question} className="group py-4">
+                  <summary className="flex cursor-pointer items-center justify-between gap-4 text-base font-semibold text-ink-900">
+                    {item.question}
+                    <span
+                      aria-hidden="true"
+                      className="shrink-0 text-ink-400 transition-transform group-open:rotate-45"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                        <path d="M12 5v14M5 12h14" />
+                      </svg>
+                    </span>
+                  </summary>
+                  <p className="mt-3 text-sm leading-6 text-ink-600">{item.answer}</p>
+                </details>
               ))}
-            </dl>
+            </div>
           </div>
         </section>
+
+        <FinalCtaSection />
       </main>
 
       <SiteFooter />

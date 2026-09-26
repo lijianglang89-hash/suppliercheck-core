@@ -10,8 +10,15 @@ export function SiteHeader() {
   return (
     <header className="border-b border-ink-200 bg-white">
       <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-6">
+        {/*
+          品牌用简称，全称留给 SEO 与正式描述（见 docs/DESIGN.md §1）。
+          全称 10 个字，放在 Logo 位会挤掉整条导航；简称更容易形成品牌记忆。
+          全称并没有消失 —— aria-label、title、footer、SEO 里都还在。
+        */}
         <Link href="/" className="flex items-baseline gap-2" aria-label={`${siteConfig.name} 首页`}>
-          <span className="text-lg font-semibold tracking-tight text-ink-900">{siteConfig.name}</span>
+          <span className="text-lg font-semibold tracking-tight text-ink-900">
+            {siteConfig.shortName}
+          </span>
           <span className="hidden text-xs font-medium uppercase tracking-widest text-ink-400 sm:inline">
             {siteConfig.latinName}
           </span>

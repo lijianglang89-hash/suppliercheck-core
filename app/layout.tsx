@@ -15,9 +15,13 @@ const siteUrl = getSiteUrl();
  */
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
+  /*
+   * SEO 标题用「品牌名｜全称」的双层结构（docs/DESIGN.md §1）：
+   * 简称在前便于记忆，全称在后保证搜索词覆盖。
+   */
   title: {
-    default: `${siteConfig.name} · ${siteConfig.tagline}`,
-    template: `%s · ${siteConfig.name}`,
+    default: `${siteConfig.shortName}｜${siteConfig.name}`,
+    template: `%s · ${siteConfig.shortName}`,
   },
   description: siteConfig.description,
   applicationName: siteConfig.name,
