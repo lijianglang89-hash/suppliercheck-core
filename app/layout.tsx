@@ -30,7 +30,10 @@ export const metadata: Metadata = {
     "供应链风控",
     "营业执照核验",
     "证书有效期检查",
-    "AI 文档审核",
+    "统一社会信用代码核验",
+    // 曾经这里写的是「AI 文档审核」。已删除：审核结论由 15 条确定性规则产出，
+    // 不是模型判断。SEO 关键词是对外宣称，把规则写成 AI 就是虚假宣传 ——
+    // 与首页「不把规则包装成 AI」是同一条纪律，不能只在看得见的地方守。
   ],
   authors: [{ name: siteConfig.name }],
   alternates: { canonical: "/" },
