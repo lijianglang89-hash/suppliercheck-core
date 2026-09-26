@@ -71,7 +71,7 @@ const FAQS: ReadonlyArray<{ question: string; answer: string }> = [
   {
     question: "支持哪些文件格式？",
     answer:
-      "产品设计支持 PDF、Word（DOCX）、Excel（XLSX）、图片（PNG / JPG）以及 ZIP 压缩包。V0.1 已建立文件类型校验与安全存储，实际的文档解析能力在后续版本接入。",
+      "已支持 PDF、Word（DOCX）、Excel（XLSX）、图片（PNG / JPG）以及 ZIP 压缩包：上传后自动提取正文，再交给审核引擎逐条核对。",
   },
   {
     question: "需要安装软件吗？",
@@ -85,7 +85,7 @@ const FAQS: ReadonlyArray<{ question: string; answer: string }> = [
   {
     question: "现在可以免费使用吗？",
     answer:
-      "V0.1 是开发版本。账号体系、工作区隔离、资料安全存储与页面框架已经就绪，核心的 AI 审核能力仍在开发中。正式开放体验后会在本页说明。",
+      "可以。当前版本已可跑完整链路：上传 → 解析 → 规则审核 → 报告。审核结论由 15 条确定性规则产出（可复算、可追溯），不是模型猜测。正式定价尚未公布。",
   },
 ];
 
@@ -112,7 +112,7 @@ export default function HomePage() {
           "@type": "Offer",
           price: "0",
           priceCurrency: "CNY",
-          description: "开发版本，正式定价尚未公布。",
+          description: "当前可免费使用，正式定价尚未公布。",
         },
       },
       {
@@ -142,7 +142,7 @@ export default function HomePage() {
             </h1>
             <p className="mt-6 max-w-2xl text-base leading-7 text-ink-600">
               面向企业采购、供应链与中小企业的供应商资料审核工具。把散落在压缩包里的营业执照、资质证书和产品资料，
-              整理成一份可直接评审的审核结论。
+              整理成一份可逐条追溯的审核报告。
             </p>
 
             <div className="mt-9 flex flex-wrap items-center gap-3">
@@ -160,8 +160,15 @@ export default function HomePage() {
               </Link>
             </div>
 
-            <p className="mt-5 text-xs text-ink-400">
-              当前为 V0.1 开发版本 · 账号与工作区能力已可用，AI 审核能力开发中
+            {/*
+              这一行是**能力边界声明**，不是免责模板。
+              曾经这里写的是"V0.1 开发版本 · AI 审核能力开发中" —— 那是当时的实情，
+              但规则引擎上线后没同步，于是首页在把一个已经能用的功能说成不能用。
+              反过来夸大一样是错：审核结论由确定性规则产出，不是模型判断，
+              所以这里写"规则审核"，不写"AI 审核"。
+            */}
+            <p className="mt-5 text-xs text-ink-500">
+              当前为 V0.3 · 15 条审核规则已上线，可跑完整审核并输出报告；模型复核尚未启用
             </p>
           </div>
         </section>

@@ -34,7 +34,7 @@ export function SiteFooter() {
       <div className="border-t border-ink-100">
         <div className="mx-auto w-full max-w-6xl px-6 py-4">
           <p className="text-xs text-ink-400">
-            © {year} {siteConfig.name}（{siteConfig.latinName}）· 当前为 V0.1 开发版本
+            © {year} {siteConfig.name}（{siteConfig.latinName}）· V0.3
           </p>
         </div>
       </div>

@@ -78,7 +78,7 @@ export function GET() {
           }}
         >
           <div style={{ display: "flex" }}>面向企业采购与供应链团队的供应商资料审核工具</div>
-          <div style={{ display: "flex", color: "#9aa2ad" }}>V0.1</div>
+          <div style={{ display: "flex", color: "#9aa2ad" }}>V0.3 · 15 条审核规则已上线</div>
         </div>
       </div>
     ),

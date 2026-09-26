@@ -39,7 +39,7 @@ export default async function RegisterPage() {
         </div>
 
         <p className="mt-6 text-xs leading-5 text-ink-500">
-          当前为 V0.1 开发版本：账号、工作区与资料安全存储能力已就绪，AI 审核能力仍在开发中。
+          当前为 V0.3：上传资料后即可发起审核，结论由 15 条确定性规则产出，可逐条追溯。
         </p>
       </main>
       <SiteFooter />
