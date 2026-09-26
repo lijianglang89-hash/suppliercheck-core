@@ -25,6 +25,12 @@ storage/
 tests
 docs
 
+# 运维脚本同样不参与：scripts/verify-v02.ts 依赖 tests/helpers 里的夹具，
+# 而 tests 已被排除，留在上下文里会让 `next build` 的类型检查报 TS2307
+# （Cannot find module '../tests/helpers/document-fixtures'）。
+# 它是在宿主上对**已经跑起来的服务**做验收用的工具，不是应用的一部分。
+scripts
+
 # 编辑器 / 系统
 .vscode
 .idea

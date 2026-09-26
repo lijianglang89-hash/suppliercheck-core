@@ -144,8 +144,11 @@ suppliercheck/
 │   ├── helpers/fixtures.ts document-fixtures.ts
 │   └── stubs/server-only.ts
 ├── deploy/
-│   ├── nginx/suppliercheck.conf.template   # 反向代理模板（不自动启用）
-│   └── scripts/ensure-storage.sh           # ★ 存储目录与权限（幂等，部署前跑）
+│   ├── nginx/suppliercheck.conf.template   # 正式 443 配置模板（由 enable-https.sh 渲染）
+│   ├── nginx/suppliercheck.http-only.conf  # ★ 阶段一：仅 80 + 放行 ACME
+│   ├── scripts/ensure-storage.sh           # ★ 存储目录与权限（幂等，部署前跑）
+│   └── scripts/enable-https.sh             # ★ 签发证书 + 切 443（带前置换闸与自动回滚）
+├── scripts/verify-v02.ts       # ★ V0.2 端到端验收（对已部署实例跑，不参与镜像构建）
 ├── storage/uploads/            # 私有存储（运行时生成，已 gitignore）
 ├── types/yazl.d.ts             # 手写的最小类型声明（仅测试用）
 ├── proxy.ts                    # 应用区乐观校验（Next 16 的 middleware 替代）
@@ -335,15 +338,30 @@ curl -s http://127.0.0.1:3010/api/health
 
 ### 国内网络注意
 
-Docker Hub 在阿里云 ECS 上通常不可达。两个镜像来源都可以覆盖：
+阿里云 ECS 上 Docker Hub 与 Alpine CDN 通常都不可达或极慢。三处来源都可以覆盖：
 
 ```bash
 # docker-compose.yml 里 postgres 默认已指向镜像加速器
 POSTGRES_IMAGE=postgres:16-alpine docker compose up -d postgres
 
-# 构建应用镜像时指定基础镜像
-docker build --build-arg NODE_IMAGE=docker.m.daocloud.io/library/node:22-alpine -t suppliercheck-app:0.1.0 .
+# 构建应用镜像时指定基础镜像与 apk 包源
+docker build \
+  --build-arg NODE_IMAGE=docker.m.daocloud.io/library/node:22-alpine \
+  --build-arg APK_MIRROR=https://mirrors.aliyun.com \
+  -t suppliercheck-app:0.2.0 .
 ```
+
+用 compose 构建时这三个值直接从 `.env` 读（见 `.env.example` 的「构建期镜像与包源」段），不用写 `--build-arg`。
+
+> ⚠️ **`APK_MIRROR` 实测差距很大**：从阿里云 ECS 取同一个 `APKINDEX.tar.gz`，
+> `dl-cdn.alpinelinux.org` 需 12 s+（基本卡在超时边缘），`mirrors.aliyun.com` 0.09 s。
+> 不换源时 `apk add libc6-compat` 会卡住数分钟且**没有任何输出**，看起来像构建死锁。
+>
+> ⚠️ **`APK_MIRROR` 这个 ARG 必须在 `FROM` 之后重新声明一次。** `FROM` 之前声明的 ARG
+> 只对 `FROM` 行可见，在 `RUN` 里会展开成**空字符串** —— 症状是 `sed` 把包源改成了
+> `/alpine/v3.24/main`（协议和主机名都没了），apk 报
+> `opening /alpine/v3.24/main/x86_64/APKINDEX.tar.gz: No such file or directory`。
+> 看着像网络问题，其实是 ARG 作用域问题。
 
 ---
 
@@ -382,21 +400,42 @@ sudo SUPPLIERCHECK_ROOT=/srv/suppliercheck bash deploy/scripts/ensure-storage.sh
 
 ### 反向代理配置
 
-`deploy/nginx/suppliercheck.conf.template` 是一份**模板，不会自动生效**。
+分两个阶段，**先 HTTP 后 HTTPS**。原因是：证书还没签发时就把 80 跳到 443，
+等于把唯一可用的入口也关掉。
 
-服务器上的现状（部署前请自行确认）：宿主 Nginx 已在 80 / 443 上服务既有站点，
+服务器上的前提（部署前请自行确认）：宿主 Nginx 已在 80 / 443 上服务既有站点，
 `conf.d/` 下已有其他项目的配置，其中一个是 80 端口的 `default_server`。
+本项目新增独立 `server` 块，`server_name` 唯一且**不设 `default_server`**，
+不改动、不覆盖任何既有配置文件。
 
-启用步骤：
+**阶段一 · 仅 HTTP（DNS 生效前就可以做）**
 
 ```bash
-sudo cp deploy/nginx/suppliercheck.conf.template /etc/nginx/conf.d/suppliercheck.conf
-sudo sed -i 's/__DOMAIN__/your-domain.example.com/g' /etc/nginx/conf.d/suppliercheck.conf
+sudo install -m 0644 deploy/nginx/suppliercheck.http-only.conf /etc/nginx/conf.d/suppliercheck.conf
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
-安全前提：**先确认域名 DNS 已解析到本机**，再申请证书、启用 443。
-本模板是独立的 `server` 块，不改动任何既有配置文件。
+此时 `supplier.ultron.xin` 已经能通过 HTTP 访问，Let's Encrypt 的 HTTP-01
+校验路径也已放行。DNS 一生效就是一个可用站点，没有「配了一半打不开」的中间态。
+
+**阶段二 · 签发证书并切到 HTTPS**
+
+```bash
+# 演练（链路上的问题应该在这里暴露，别去撞 ACME 限额）
+sudo bash deploy/scripts/enable-https.sh --email you@example.com --staging
+# 演练通过后签发正式证书
+sudo bash deploy/scripts/enable-https.sh --email you@example.com --prod
+```
+
+脚本做的事：校验 DNS → 校验阶段一配置在位 → **实测 HTTP-01 路径可达（不消耗 ACME 配额）**
+→ certbot 签发（带 `--deploy-hook` 续期后自动 reload）→ 用模板渲染 443 配置替换阶段一
+→ `nginx -t` 失败自动回滚 → reload → 端到端验证。
+
+> ⚠️ 必须先加 DNS：`supplier.ultron.xin  A  39.108.235.240`。
+> 没有解析记录时脚本会在第 1 步直接退出，不会做任何变更。
+
+> ⚠️ 证书与 443 **必须一起上线**：只加 443 块而 `ssl_certificate` 指向不存在的文件，
+> `nginx -t` 会失败，reload 就做不了；反过来只签证书不加 443 块，证书也不会被用到。
 
 ---
 
