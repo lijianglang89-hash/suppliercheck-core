@@ -1,0 +1,10 @@
+# 统一行尾为 LF。
+# Dockerfile 与 shell 脚本若带 CRLF 会在 Linux 容器里出现难以定位的执行错误。
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.woff binary
+*.woff2 binary

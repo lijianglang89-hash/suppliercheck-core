@@ -1,0 +1,32 @@
+# 构建上下文排除项。上传的资料与本地 secrets 绝不进入镜像。
+.git
+.gitignore
+.github
+
+node_modules
+.next
+out
+build
+coverage
+*.tsbuildinfo
+
+# 环境变量：只允许示例文件进入构建上下文
+.env
+.env.*
+!.env.example
+
+# 私有数据
+data/
+storage/
+*.sqlite
+*.db
+
+# 测试与文档不参与运行时
+tests
+docs
+
+# 编辑器 / 系统
+.vscode
+.idea
+.DS_Store
+*.log

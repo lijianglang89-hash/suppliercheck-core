@@ -1,0 +1,64 @@
+@import "tailwindcss";
+
+/*
+ * 设计令牌 —— 企业软件风格：克制、清晰、层级分明。
+ * 明确不做：花哨渐变、AI 光效、游戏化元素、夸张动画。
+ * 字体使用系统字体栈（不用 next/font/google，避免构建期外网依赖）。
+ */
+@theme {
+  --font-sans:
+    system-ui, -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", "Source Han Sans SC", "Noto Sans CJK SC", "Helvetica Neue", Arial,
+    sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* 品牌主色：沉稳的深蓝，符合企业采购/合规场景的信任感 */
+  --color-brand-50: #f2f6fb;
+  --color-brand-100: #e2ecf7;
+  --color-brand-200: #c5d9ee;
+  --color-brand-300: #9bbde0;
+  --color-brand-400: #6a99cc;
+  --color-brand-500: #457bb4;
+  --color-brand-600: #2f6097;
+  --color-brand-700: #274e7b;
+  --color-brand-800: #1f3d60;
+  --color-brand-900: #172c46;
+
+  /* 中性色阶 */
+  --color-ink-50: #f7f8f9;
+  --color-ink-100: #eef0f2;
+  --color-ink-200: #e2e5e9;
+  --color-ink-300: #cbd0d7;
+  --color-ink-400: #9aa2ad;
+  --color-ink-500: #6b7482;
+  --color-ink-600: #4d5563;
+  --color-ink-700: #363d49;
+  --color-ink-800: #232932;
+  --color-ink-900: #161a21;
+
+  /* 语义色 */
+  --color-success-600: #1f7a4d;
+  --color-warning-600: #a35a06;
+  --color-danger-600: #b3261e;
+
+  --radius-card: 0.5rem;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background-color: var(--color-ink-50);
+  color: var(--color-ink-800);
+  font-family: var(--font-sans);
+  font-feature-settings: "tnum" 1;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 焦点可见性：键盘用户优先，符合企业采购/合规类产品的可达性要求 */
+:focus-visible {
+  outline: 2px solid var(--color-brand-600);
+  outline-offset: 2px;
+}

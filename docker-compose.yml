@@ -1,0 +1,91 @@
+# ---------------------------------------------------------------------------
+# 供应商智审 SupplierCheck · 部署编排
+#
+# 刻意只保留两个服务：
+#   - app      应用本体（Next.js standalone）
+#   - postgres 数据库
+#
+# 没有 Redis / Nginx / Traefik / MinIO —— V0.1 用不到，
+# 等到真的需要时再加，而不是为了「看起来专业」先塞进来。
+#
+# 端口策略（服务器上已有 ULTRON 项目占用 3000 / 80 / 443）：
+#   - app      绑定 127.0.0.1:3010，仅本机可达，由宿主 nginx 反代
+#   - postgres 绑定 127.0.0.1:5432，不对公网暴露
+# ---------------------------------------------------------------------------
+
+services:
+  postgres:
+    # 默认走镜像加速器：阿里云 ECS 直连 Docker Hub 会超时。
+    # 海外环境可覆盖为 postgres:16-alpine。
+    image: ${POSTGRES_IMAGE:-docker.m.daocloud.io/library/postgres:16-alpine}
+    container_name: suppliercheck-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-suppliercheck}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD 必须设置}
+      POSTGRES_DB: ${POSTGRES_DB:-suppliercheck}
+      TZ: Asia/Shanghai
+      # 4 GB 内存的机器上给数据库留足余量，避免与宿主项目争抢
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    command:
+      - postgres
+      - -c
+      - max_connections=40
+      - -c
+      - shared_buffers=128MB
+      - -c
+      - work_mem=4MB
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-suppliercheck} -d ${POSTGRES_DB:-suppliercheck}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - suppliercheck
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NODE_IMAGE: ${NODE_IMAGE:-node:22-alpine}
+    image: suppliercheck-app:0.1.0
+    container_name: suppliercheck-app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: "3010"
+      HOSTNAME: "0.0.0.0"
+      APP_URL: ${APP_URL:?APP_URL 必须设置（用于 canonical / sitemap 的绝对 URL）}
+      SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET 必须设置}
+      AI_PROVIDER: ${AI_PROVIDER:-mock}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-}
+      AI_BASE_URL: ${AI_BASE_URL:-}
+      STORAGE_PROVIDER: ${STORAGE_PROVIDER:-local}
+      # 容器内路径固定为 /data/uploads，与挂载卷一一对应
+      STORAGE_PATH: /data/uploads
+      MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-26214400}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      # 容器内通过服务名访问数据库，不经过宿主机端口
+      DATABASE_URL: postgresql://${POSTGRES_USER:-suppliercheck}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-suppliercheck}
+    ports:
+      # 只绑本机回环：外部流量必须经过宿主 nginx，避免应用直接暴露公网
+      - "127.0.0.1:${APP_PORT:-3010}:3010"
+    volumes:
+      - ./data/uploads:/data/uploads
+    networks:
+      - suppliercheck
+
+networks:
+  suppliercheck:
+    name: suppliercheck
+    driver: bridge

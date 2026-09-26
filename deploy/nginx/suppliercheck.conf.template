@@ -1,0 +1,73 @@
+# ============================================================================
+# 供应商智审 · Nginx 反向代理模板
+#
+# ⚠️ 这是模板，不会自动生效。
+#
+# 服务器现状（务必先确认）：宿主机 nginx 已在 80/443 上服务 ultron.xin，
+# 因此启用本文件前必须：
+#   1. 把 __DOMAIN__ 替换为真实域名；
+#   2. 确认 DNS 已解析到本机；
+#   3. 先放行 80 申请证书，再启用 443；
+#   4. `nginx -t` 通过后才 reload。
+#
+# 安全说明：
+#   - 本模板是独立 server 块，与现有 conf.d/ultron.conf 互不影响；
+#   - 不修改、不覆盖任何现有配置文件；
+#   - 现有的 conf.d/lead-webhook.conf 是 80 的 default_server，
+#     只在「没有任何 server_name 匹配」时兜底，因此不会吞掉本域名流量。
+# ============================================================================
+
+# --- 80：仅用于跳转与 ACME 证书校验 ---------------------------------------
+server {
+    listen 80;
+    listen [::]:80;
+    server_name __DOMAIN__;
+
+    # Let's Encrypt HTTP-01 校验
+    location /.well-known/acme-challenge/ {
+        root /var/www/html;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+# --- 443：应用入口 ---------------------------------------------------------
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name __DOMAIN__;
+
+    ssl_certificate     /etc/letsencrypt/live/__DOMAIN__/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/__DOMAIN__/privkey.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+
+    # 上传资料包：与 MAX_UPLOAD_BYTES 保持一致的余量
+    client_max_body_size 30m;
+
+    # 安全响应头（应用自身也会下发一部分，这里补齐 nginx 层）
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    # 静态资源由 Next.js 产出，可放心长缓存
+    location /_next/static/ {
+        proxy_pass http://127.0.0.1:3010;
+        proxy_cache_valid 200 30d;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:3010;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 60s;
+    }
+}
