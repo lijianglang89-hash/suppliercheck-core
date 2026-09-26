@@ -28,7 +28,14 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
-# 构建期不读取真实 secrets；应用对环境的读取是惰性的，不会在 build 阶段触发校验。
+
+# ⚠️ APP_URL 会被固化进静态预渲染页面（canonical / Open Graph / sitemap），
+# 因此它必须在**构建期**提供，只在运行时注入是无效的。
+# 换域名后需要重新构建镜像 —— 这是静态渲染换来的代价，可以接受。
+ARG APP_URL=http://localhost:3010
+ENV APP_URL=${APP_URL}
+
+# 构建期不读取真实 secrets；应用对其他环境变量的读取是惰性的，不会在 build 阶段触发校验。
 RUN npm run build
 
 

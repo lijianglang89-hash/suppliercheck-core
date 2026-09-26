@@ -54,6 +54,8 @@ services:
       dockerfile: Dockerfile
       args:
         NODE_IMAGE: ${NODE_IMAGE:-node:22-alpine}
+        # 会固化进静态页面的 canonical / OG / sitemap，必须在构建期传入
+        APP_URL: ${APP_URL:-http://localhost:3010}
     image: suppliercheck-app:0.1.0
     container_name: suppliercheck-app
     restart: unless-stopped
