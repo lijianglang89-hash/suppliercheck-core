@@ -70,9 +70,28 @@ export function CreateReviewForm({
   initialSupplierId = "",
 }: CreateReviewFormProps) {
   const [state, formAction] = useActionState(createReviewAction, EMPTY_FORM_STATE);
-  const [selected, setSelected] = useState<Set<string>>(
-    () => new Set(initialDocumentIds.filter((id) => documents.some((row) => row.id === id))),
-  );
+  /**
+   * 资料选择的初值。
+   *
+   * ⚠️ 这里曾经是 `new Set(initialDocumentIds)` —— 从资料库带参跳转过来才有值，
+   * 直接进本页时**一份都不选**，于是「开始审核」按钮看着能点、提交却是空资料集。
+   * 实测复现了用户报的「上传后没有任何按钮开始审核」：按钮一直都在，
+   * 是它什么都不做。这比按钮不存在更难排查。
+   *
+   * 现在的规则：显式带 correlation 过来时尊重它（用户刚在资料库里选过），
+   * 否则**默认预选全部可参与审核的资料** —— 刚上传完就想审核是主路径，
+   * 让用户先去找一个复选框是本末倒置。用户仍可「清空」。
+   */
+  const [selected, setSelected] = useState<Set<string>>(() => {
+    const explicit = initialDocumentIds.filter((id) => documents.some((row) => row.id === id));
+    if (explicit.length > 0) return new Set(explicit);
+    return new Set(
+      documents
+        .filter((row) => isUsable(row))
+        .slice(0, maxDocuments)
+        .map((row) => row.id),
+    );
+  });
 
   function toggle(id: string) {
     setSelected((previous) => {
@@ -203,7 +222,7 @@ export function CreateReviewForm({
 
             <ul className="max-h-72 divide-y divide-ink-100 overflow-y-auto">
               {documents.map((document) => {
-                const usable = document.status === "READY" && (document.charCount ?? 0) > 0;
+                const usable = isUsable(document);
                 return (
                   <li key={document.id} className="flex items-start gap-3 px-4 py-2">
                     <input
@@ -277,4 +296,12 @@ function rerunActionFor(runId: string) {
     const { rerunReviewAction } = await import("@/app/actions/reviews");
     return rerunReviewAction(_prevState, formData);
   };
+}
+
+/**
+ * 资料能否真正参与审核：解析完成且有正文长度。
+ * 与服务端判定保持一致 —— 勾选一份「可查看」但字数为 0 的资料没有意义。
+ */
+function isUsable(document: Pick<DocumentOption, "status" | "charCount">): boolean {
+  return document.status === "READY" && (document.charCount ?? 0) > 0;
 }

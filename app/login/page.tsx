@@ -13,6 +13,13 @@ export const metadata: Metadata = {
   title: "登录",
   description: "登录供应商智审，管理你的供应商资料审核工作区。",
   alternates: { canonical: "/login" },
+  /**
+   * 登录页不参与搜索排名：页面只有一个表单，对搜索用户没有价值，
+   * 让它进索引只会稀释站内质量信号。
+   * follow 保留 —— 万一有外部链接指向这里，权重仍应流向站内其他页面。
+   * 注意不能用 robots.txt 的 Disallow 代替，原因见 app/robots.ts。
+   */
+  robots: { index: false, follow: true },
 };
 
 /** 读取会话与数据库，必须按请求渲染。 */

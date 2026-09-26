@@ -12,20 +12,42 @@
 
 import Link from "next/link";
 
+import { CATEGORY_LABELS, CATEGORY_ORDER } from "@/lib/reviews/labels";
+import { REVIEW_RULES } from "@/lib/reviews/rules";
 import { StatusPill } from "@/components/landing/visuals";
 
-const METRICS: ReadonlyArray<{ value: string; label: string; note: string }> = [
-  { value: "15", label: "条审核规则", note: "完整性、有效期、主体、一致性" },
-  { value: "5", label: "类检查维度", note: "每条发现都归入其中一类" },
-  { value: "1", label: "份审核报告", note: "问题清单 + 原文摘录" },
-];
+/**
+ * 这三个数字**运行时从 `REVIEW_RULES` 算出来**，不是写死的常量。
+ * 以前写的是字面量 "15" / "5"，一旦有人加一条规则，首页就会开始说一个过去的数字 ——
+ * 而没有任何测试会发现。
+ */
+function buildMetrics() {
+  const activeCategories = new Set(
+    REVIEW_RULES.map((rule) => rule.category).filter((category) => category !== "AI"),
+  );
+  return [
+    {
+      value: String(REVIEW_RULES.length),
+      label: "条审核规则",
+      note: "完整性、有效期、主体、一致性",
+    },
+    {
+      value: String(activeCategories.size),
+      label: "类检查维度",
+      note: "每条发现都归入其中一类",
+    },
+    { value: "1", label: "份审核报告", note: "问题清单 + 原文摘录" },
+  ] as const;
+}
 
 export function MetricsSection() {
+  const metrics = buildMetrics();
+
   return (
     <section className="border-b border-ink-200 bg-brand-tint">
       <div className="mx-auto w-full max-w-6xl px-6 py-12 lg:py-14">
         <ul className="grid gap-8 sm:grid-cols-3">
-          {METRICS.map((item) => (
+          {metrics.map((item) => (
             <li key={item.label}>
               <p className="text-3xl font-semibold tabular-nums tracking-tight text-brand-700 lg:text-4xl">
                 {item.value}
@@ -152,6 +174,56 @@ export function CapabilitiesSection() {
             </li>
           ))}
         </ul>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * 15 条规则的清单**直接从 `REVIEW_RULES` 读**，不在本页面维护副本。
+ *
+ * 这是 docs/DESIGN.md §0 硬规则 2 的要求：页面上写的数字必须来自真实功能。
+ * 如果这里是手写数组，有人加一条规则而忘了改首页，首页就会开始说谎，
+ * 而且没有任何测试能发现 —— 从源数据读，新增规则当天首页就会多一行。
+ */
+export function RulesSection() {
+  const groups = CATEGORY_ORDER.map((category) => ({
+    category,
+    label: CATEGORY_LABELS[category],
+    rules: REVIEW_RULES.filter((rule) => rule.category === category),
+  })).filter((group) => group.rules.length > 0);
+
+  return (
+    <section aria-labelledby="rules-heading" className="border-b border-ink-200 bg-white">
+      <div className="mx-auto w-full max-w-6xl px-6 py-16 lg:py-20">
+        <h2 id="rules-heading" className="text-2xl font-semibold tracking-tight text-ink-900">
+          不是一句「系统判断」，是 {REVIEW_RULES.length} 条写明的规则
+        </h2>
+        <p className="mt-3 max-w-2xl text-sm leading-6 text-ink-600">
+          每条规则检查什么、什么情况下标记「问题」、什么情况下不下结论，都在下面列着。
+          规则清单也是你可以自己关掉的：在审核模板里不勾选的规则不会出现在任何结论里。
+        </p>
+
+        <div className="mt-10 grid gap-6 lg:grid-cols-2">
+          {groups.map((group) => (
+            <div key={group.category} className="rounded-lg border border-ink-200 bg-brand-mist p-5">
+              <div className="flex items-baseline justify-between gap-3">
+                <h3 className="text-base font-semibold text-ink-900">{group.label}</h3>
+                <span className="shrink-0 text-xs tabular-nums text-ink-500">
+                  {group.rules.length} 条
+                </span>
+              </div>
+              <ul className="mt-3 divide-y divide-ink-200">
+                {group.rules.map((rule) => (
+                  <li key={rule.id} className="py-2">
+                    <p className="text-sm font-medium text-ink-800">{rule.label}</p>
+                    <p className="mt-0.5 text-xs leading-5 text-ink-600">{rule.description}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   );

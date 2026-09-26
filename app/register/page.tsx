@@ -12,6 +12,8 @@ export const metadata: Metadata = {
   title: "免费体验",
   description: "注册供应商智审账号，创建工作区并开始审核供应商资料。",
   alternates: { canonical: "/register" },
+  /** 与 /login 同理：表单页不参与排名，去索引靠这里而不是 robots.txt。 */
+  robots: { index: false, follow: true },
 };
 
 export const dynamic = "force-dynamic";

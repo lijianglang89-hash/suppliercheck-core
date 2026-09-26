@@ -8,6 +8,7 @@ import {
   CapabilitiesSection,
   FinalCtaSection,
   MetricsSection,
+  RulesSection,
   SecuritySection,
   WorkflowSection,
 } from "@/components/landing/sections";
@@ -179,6 +180,7 @@ export default function HomePage() {
         <BeforeAfterSection />
         <ReportSection />
         <CapabilitiesSection />
+        <RulesSection />
         <WorkflowSection />
         <SecuritySection />
 

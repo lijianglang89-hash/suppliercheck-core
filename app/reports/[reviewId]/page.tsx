@@ -153,18 +153,31 @@ export default async function ReportPage({
           </section>
         ) : null}
 
-        {run.aiNotes && Array.isArray(run.aiNotes) && run.aiNotes.length > 0 ? (
-          <section className="border-b border-ink-200 py-5">
-            <h2 className="text-sm font-semibold text-ink-900">AI 复核说明</h2>
-            <ul className="mt-2 space-y-1">
-              {(run.aiNotes as string[]).map((note) => (
-                <li key={note} className="text-xs leading-relaxed text-ink-600">
-                  · {note}
-                </li>
-              ))}
-            </ul>
-          </section>
-        ) : null}
+        {/*
+          AI 复核说明区块。
+          ⚠️ 必须去重：lib/reviews/engine.ts 会把 ai.notes 并进 summary.coverageNotes
+          （summary 是持久化摘要，那里必须写明 AI 是否参与，单测钉着），
+          于是「覆盖度说明」里已经有这批文案了。不去重的话页面上会连着出现
+          六行完全一样的话 —— 实测报告页就是这样，读起来像系统坏了。
+        */}
+        {(() => {
+          const aiNotes = Array.isArray(run.aiNotes) ? (run.aiNotes as string[]) : [];
+          const alreadyInCoverage = new Set(summary?.coverageNotes ?? []);
+          const unique = aiNotes.filter((note) => !alreadyInCoverage.has(note));
+          if (unique.length === 0) return null;
+          return (
+            <section className="border-b border-ink-200 py-5">
+              <h2 className="text-sm font-semibold text-ink-900">AI 复核说明</h2>
+              <ul className="mt-2 space-y-1">
+                {unique.map((note) => (
+                  <li key={note} className="text-xs leading-relaxed text-ink-600">
+                    · {note}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          );
+        })()}
 
         {grouped.length === 0 ? (
           <section className="py-8">

@@ -98,7 +98,7 @@ export async function createReviewRunAndEnqueue(params: CreateReviewRunParams): 
   }
 
   const provider = getAIProvider();
-  const name = buildRunName(params.name, supplierName, template.name);
+  const name = buildRunName(params.name, supplierName, template.name, rows);
 
   const run = await createReviewRun({
     workspaceId: params.workspaceId,
@@ -137,16 +137,36 @@ function dedupeUuids(values: readonly string[]): string[] {
   return [...seen];
 }
 
+/**
+ * 审核记录的显示名。
+ *
+ * 「未命名主体」曾经是所有未关联供应商的审核的默认名 —— 实测跑到第三轮时，
+ * 列表里已经是**三条一模一样的「未命名主体 · 供应商准入审核」**，
+ * 除了时间戳没有任何东西能把它们区分开。这是列表最难用的地方。
+ *
+ * 回退顺序：用户填的名称 → 关联供应商名 → **资料文件名**（去掉扩展名）。
+ * 文件名至少是用户自己认得的东西，而且此时已经确定可用（rows 刚回库校验过归属）。
+ *
+ * 刻意**不从正文里抽公司名放在这里**：那要等审核跑完才知道，
+ * 而这条记录在「审核中」状态下就要能被人认出来。
+ */
 function buildRunName(
   requested: string | null | undefined,
   supplierName: string | null,
   templateName: string,
+  rows: readonly Pick<DocumentWithTextRow, "originalFilename">[] = [],
 ): string {
   const trimmed = (requested ?? "").trim();
   if (trimmed.length > 0) {
     return trimmed.slice(0, MAX_RUN_NAME_CHARS);
   }
-  const subject = supplierName ?? "未命名主体";
+  const fallbackFilename = rows[0]?.originalFilename?.replace(/\.[^.]+$/, "").trim();
+  const fallbackSubject = fallbackFilename
+    ? rows.length > 1
+      ? `${fallbackFilename} 等 ${rows.length} 份`
+      : fallbackFilename
+    : null;
+  const subject = supplierName ?? fallbackSubject ?? "未命名主体";
   const stamp = new Date().toLocaleString("zh-CN", {
     timeZone: "Asia/Shanghai",
     year: "numeric",

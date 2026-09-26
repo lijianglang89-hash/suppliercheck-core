@@ -219,7 +219,14 @@ function buildCoverageNotes(input: BuildSummaryInput, readableCount: number): st
     notes.push(`本次审核按模板配置跳过了 ${input.skipped.length} 条规则。`);
   }
 
-  // AI 的说明直接并入覆盖度说明：它本质上是同一件事 ——「这次结论是怎么来的」。
+  /**
+   * AI 的说明并入覆盖度说明：Summary 是**持久化**的结论摘要，
+   * 单独存一个 ai 字段的话，任何只读 summary 的消费者（导出、对比、快照）
+   * 都会得出「这份报告有 AI 参与」的错误印象。这条由单测钉住，不能去掉。
+   *
+   * ⚠️ 副作用：报告页同时渲染「覆盖度说明」与「AI 复核说明」时会出现重复文案，
+   * 因此页面侧必须去重 —— 去重的责任在**展示层**，这里不能少写。
+   */
   notes.push(...input.aiNotes);
 
   return notes;

@@ -46,9 +46,42 @@ export function getSiteUrl(): string {
   return "http://localhost:3010";
 }
 
-/** 需要出现在 sitemap 中的公开页面。仅在导航结构变化时同步维护。 */
+/**
+ * 需要出现在 sitemap 中的公开页面。仅在导航结构变化时同步维护。
+ *
+ * 这里**刻意不含 `/login` 与 `/register`**：
+ * 两个页面内容很薄（只有一个表单），拿它们去争搜索排名没有意义，
+ * 放进 sitemap 反而向搜索引擎声明「这是值得收录的内容」。
+ * 正确做法是 robots.txt 允许抓取、页面用 `<meta name="robots" content="noindex">` 声明不索引 ——
+ * 注意不能用 robots.txt 的 Disallow 代替 noindex：被 Disallow 的页面搜索引擎看不到 noindex 标记，
+ * 反而可能因为外链被收录成「无摘要的空结果」。
+ *
+ * ⚠️ 唯一的条目意味着本站目前确实只有一个可被索引的页面。
+ * 这是真实状态，不要用塞薄页面进 sitemap 的方式掩盖它
+ * （docs/DESIGN.md §0 硬规则 2：页面上的东西必须来自真实功能）。
+ */
 export const PUBLIC_ROUTES: ReadonlyArray<{ path: string; priority: number }> = [
   { path: "/", priority: 1 },
-  { path: "/login", priority: 0.5 },
-  { path: "/register", priority: 0.6 },
+];
+
+/**
+ * 需要出现在 robots.txt Disallow 中的应用区域。
+ * 这些路径全部要登录，爬虫抓到只会拿到重定向。
+ *
+ * ⚠️ **路由命名空间冲突（已知约束，未解决）**：
+ * 未来若要建公开的内容页（如 `/templates/供应商准入资料清单`、`/guides/...`），
+ * 会与这里已 Disallow 的登录区同名路径（`/templates` 是模板管理页）冲突 ——
+ * 届时要么给公开内容换前缀（如 `/checklist/`、`/knowledge/`），
+ * 要么把登录区整体迁到 `/app/` 前缀下。**在改名之前不要新增同名公开页面**，
+ * 否则新页面会被 robots.txt 屏蔽，而排查成本很高。
+ */
+export const PRIVATE_ROUTE_PREFIXES: readonly string[] = [
+  "/api/",
+  "/dashboard",
+  "/documents",
+  "/suppliers",
+  "/reviews",
+  "/reports",
+  "/templates",
+  "/settings",
 ];
