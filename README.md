@@ -275,9 +275,28 @@ npx vitest run tests/integration  # 只跑集成测试（需要 DATABASE_URL 可
 | --- | --- |
 | `unit/documents-core.test.ts` | 文本累积的截断语义、控制字符清洗、超限时中断管道、校验和 |
 | `unit/documents-parsers.test.ts` | PDF / DOCX / XLSX 的真实提取结果（含富文本、日期、空单元格、公式结果） |
+| `unit/documents-parsers-chinese-pdf.test.ts` | **中文 PDF 提取**：结构 + 内容 + **反乱码**三层断言，用仓库里的真实 PDF 夹具 |
 | `unit/documents-archive.test.ts` | 压缩包七道闸门、路径穿越、压缩炸弹、元数据撒谎、回调失败时的中止语义 |
 | `unit/config-schema.test.ts` | 环境变量默认值与硬上限一致（默认值只允许有一个事实来源） |
 | `integration/document-metadata.test.ts` | 文档落库与**跨工作区隔离**（另一个工作区查不到） |
+
+### 中文 PDF 夹具的来历（别手改那个二进制）
+
+`tests/fixtures/supplier-package-zh.pdf` 由 `scripts/make-sample-supplier-pdf.py` 生成，
+**内容是虚构示例**（公司名以「示例」开头，代码/电话/邮箱均为占位符），不指向任何真实企业。
+
+```bash
+python scripts/make-sample-supplier-pdf.py        # 依赖 fpdf2 + 一份中文 TTF
+```
+
+为什么不能用代码合成：手工拼的极简 PDF **塞不进中文** —— 写进去的 UTF-16BE 十六进制串
+会被 pdf.js 按 WinAnsi 逐字节读出来，变成 `O ^ UF D (`f Nf g...` 这种乱码。
+所以中文提取这条断言只能靠**真实字体嵌入 + 真实 CMap** 生成的文件来守。
+
+改内容请改脚本再重新生成，不要手改 PDF 二进制（否则脚本和夹具会静默失去同步）。
+
+> 反乱码断言是这三层里最容易被漏掉、也最要紧的一层：
+> 前两层（结构、关键串出现）都可能通过，而文字其实已经错了。
 
 ### 冒烟测试要打生产实例
 

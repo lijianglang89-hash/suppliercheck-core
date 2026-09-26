@@ -1,19 +1,22 @@
 /**
  * 真实文件探测（手动 / 可选）。
  *
- * 存在的理由是一个明确的能力缺口：手工合成的 PDF 夹具放不了中文（详见
- * tests/helpers/document-fixtures.ts 里 buildMinimalPdf 的说明），
- * 于是「PDF 中文提取到底能不能用」这件事**没有被自动化测试覆盖**。
- * 这个缺口不能靠一条永远通过的假断言糊过去，只能靠真实文件验证。
+ * ⚠️ 2026-09-27 更新：这里的「中文 PDF 提取无人覆盖」缺口**已经闭合**。
+ * 现在有一份随仓库提交的真实中文 PDF 夹具
+ * （`tests/fixtures/supplier-package-zh.pdf`，由 `scripts/make-sample-supplier-pdf.py`
+ * 用真实字体嵌入生成），并由 `tests/unit/documents-parsers-chinese-pdf.test.ts`
+ * 在**每次 CI** 里断言结构、内容、以及「没有乱码」。所以这个文件不再是唯一防线。
  *
- * 用法（把任何一份真实 PDF 的路径传进来）：
+ * 它保留下来是因为还有另一件事它才能做：拿**任意一份真实业务 PDF**（客户发来的、
+ * 扫描件、带复杂排版的）临时验证一下。夹具代表的是我们自己造的文件，
+ * 覆盖不了真实世界的全部排版。
+ *
+ * 用法：
  *
  *   REAL_PDF="/path/to/真实供应商资质.pdf" npx vitest run tests/manual
  *
  * 它会报告：页数、提取字符数、中文字符数、疑似乱码字符数、解析器提示语。
  * 含中文时自动断言「没有替换字符（U+FFFD）」，不含中文时只报告统计。
- *
- * 建议在正式接入真实供应商资料前，用一份真实的中文 PDF 跑一次。
  */
 import { readFile } from "node:fs/promises";
 import { Readable } from "node:stream";
