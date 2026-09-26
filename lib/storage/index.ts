@@ -23,7 +23,16 @@ type StorageFactory = (options: {
 const STORAGE_FACTORIES: Partial<Record<string, StorageFactory>> = {
   local: (options) =>
     new LocalStorageProvider({
-      rootDir: path.resolve(process.cwd(), options.storagePath),
+      /**
+       * 存储根目录来自配置（开发是相对路径，生产是容器内绝对路径 /storage/uploads），
+       * 因此这个 path.resolve **无法被静态分析**。
+       *
+       * 不加 turbopackIgnore 的后果实测很具体：Turbopack 会认为「运行时可能访问项目里
+       * 任何路径」，于是把整个项目（含 public/、测试夹具、迁移文件）都算成依赖打进
+       * standalone 产物 —— 镜像变大、部署变慢，而我们其实只读一个数据目录。
+       * 这里显式关掉追踪：这是被理解的路径，不是意外。
+       */
+      rootDir: path.resolve(/* turbopackIgnore: true */ process.cwd(), options.storagePath),
       secret: options.secret,
       appUrl: options.appUrl,
     }),
@@ -57,4 +66,10 @@ export function resetStorageProviderCache(): void {
 }
 
 export { LocalStorageProvider } from "./providers/local";
-export type { SignedUrlOptions, StorageProvider, StoredObject, UploadInput } from "./types";
+export type {
+  SignedUrlOptions,
+  StorageProvider,
+  StoredObject,
+  UploadInput,
+  UploadStreamInput,
+} from "./types";

@@ -9,6 +9,7 @@
  */
 import {
   bigint,
+  boolean,
   index,
   integer,
   jsonb,
@@ -19,6 +20,7 @@ import {
   timestamp,
   uniqueIndex,
   uuid,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 
 /* ------------------------------------------------------------------ */
@@ -186,6 +188,13 @@ export const documents = pgTable(
     checksum: text("checksum").notNull(),
     /** 私有存储中的相对路径，绝不产生公开 URL。 */
     storagePath: text("storage_path").notNull(),
+    /**
+     * 来源压缩包。上传 .zip 时，包内每个可处理文件会被展开成一份独立子文档，
+     * 指向同一个父文档 —— 子文档必须是独立行，否则无法各自审计、各自失败。
+     */
+    parentDocumentId: uuid("parent_document_id").references((): AnyPgColumn => documents.id, {
+      onDelete: "cascade",
+    }),
     status: documentStatusEnum("status").notNull().default("UPLOADED"),
     processingStatus: jobStatusEnum("processing_status").notNull().default("PENDING"),
     pageCount: integer("page_count"),
@@ -200,6 +209,10 @@ export const documents = pgTable(
     index("documents_workspace_idx").on(table.workspaceId),
     index("documents_workspace_status_idx").on(table.workspaceId, table.status),
     index("documents_checksum_idx").on(table.checksum),
+    index("documents_parent_idx").on(table.parentDocumentId),
+    // 存储键由 workspaceId + documentId 生成，天然全局唯一；
+    // 加上唯一约束后，下载路径反查文档时不可能出现歧义。
+    uniqueIndex("documents_storage_path_unique").on(table.storagePath),
   ],
 );
 
@@ -229,6 +242,47 @@ export const documentProcessingJobs = pgTable(
     index("document_processing_jobs_workspace_idx").on(table.workspaceId),
     index("document_processing_jobs_document_idx").on(table.documentId),
     index("document_processing_jobs_status_idx").on(table.status),
+  ],
+);
+
+/**
+ * 文档纯文本提取结果。
+ *
+ * 单独成表而不是塞进 documents 的理由：
+ * - 列表页只需要元数据，不该为了显示一个文件名把几十万字的正文一起读出来；
+ * - 提取结果是「可再生的派生物」，重建它不影响文件本身，语义上与 documents 不同层；
+ * - 后续接入全文检索时，只需要给这张表加索引，不用动 documents 的热路径。
+ */
+export const documentTexts = pgTable(
+  "document_texts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    documentId: uuid("document_id")
+      .notNull()
+      .references(() => documents.id, { onDelete: "cascade" }),
+    /** 实际执行提取的解析器标识，便于回溯「这份文本是谁产出的」。 */
+    parserId: text("parser_id").notNull(),
+    /** 归一化后的纯文本。 */
+    text: text("text").notNull(),
+    charCount: integer("char_count").notNull().default(0),
+    /** 是否被截断。落库为 true 时，界面必须如实提示，不得当作完整内容。 */
+    truncated: boolean("truncated").notNull().default(false),
+    pageCount: integer("page_count"),
+    /** 工作表名等格式特有的结构信息，结构随格式变化。 */
+    structure: jsonb("structure").notNull().default({}),
+    /** 面向使用者的说明（如「未提取到文本层」「暂不支持本地 OCR」）。 */
+    notes: jsonb("notes").notNull().default([]),
+    extractedAt: timestamp("extracted_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    // 一份文档只有一份提取结果；重新解析时覆盖而不是追加。
+    uniqueIndex("document_texts_document_unique").on(table.documentId),
+    index("document_texts_workspace_idx").on(table.workspaceId),
   ],
 );
 
@@ -436,11 +490,14 @@ export type NewWorkspace = typeof workspaces.$inferInsert;
 export type WorkspaceMember = typeof workspaceMembers.$inferSelect;
 export type DocumentRow = typeof documents.$inferSelect;
 export type NewDocument = typeof documents.$inferInsert;
+export type DocumentTextRow = typeof documentTexts.$inferSelect;
+export type NewDocumentText = typeof documentTexts.$inferInsert;
+export type DocumentProcessingJob = typeof documentProcessingJobs.$inferSelect;
 export type Questionnaire = typeof questionnaires.$inferSelect;
 export type Question = typeof questions.$inferSelect;
 export type Evidence = typeof evidence.$inferSelect;
 export type Answer = typeof answers.$inferSelect;
-export type AnswerReview = typeof answers.$inferSelect;
+export type AnswerReview = typeof answerReviews.$inferSelect;
 export type AuditReport = typeof auditReports.$inferSelect;
 export type ExportRow = typeof exports.$inferSelect;
 export type WorkspaceRole = (typeof workspaceRoleEnum.enumValues)[number];

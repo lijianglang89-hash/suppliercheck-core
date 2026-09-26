@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { EnvValidationError, isSensitiveEnvKey, parseServerEnv } from "@/lib/config/schema";
+import {
+  DEFAULT_STORAGE_PATH,
+  EnvValidationError,
+  isSensitiveEnvKey,
+  parseServerEnv,
+} from "@/lib/config/schema";
+import { DEFAULT_MAX_UPLOAD_BYTES } from "@/lib/documents/limits";
 
 /** 一份最小可用的合法环境。 */
 function validEnv(overrides: Record<string, string | undefined> = {}) {
@@ -20,8 +26,10 @@ describe("parseServerEnv", () => {
     expect(env.APP_URL).toBe("http://localhost:3010");
     expect(env.AI_PROVIDER).toBe("mock");
     expect(env.STORAGE_PROVIDER).toBe("local");
-    expect(env.STORAGE_PATH).toBe("./data/uploads");
-    expect(env.MAX_UPLOAD_BYTES).toBe(25 * 1024 * 1024);
+    expect(env.STORAGE_PATH).toBe(DEFAULT_STORAGE_PATH);
+    // 引用常量而不是硬编码数字：默认值只允许有**一个**事实来源，
+    // 否则改了 limits 忘了改测试（或反之）会让测试变成假证据。
+    expect(env.MAX_UPLOAD_BYTES).toBe(DEFAULT_MAX_UPLOAD_BYTES);
     expect(env.LOG_LEVEL).toBe("info");
   });
 
@@ -77,6 +85,25 @@ describe("parseServerEnv", () => {
 
   it("V0.1 尚未实现的 oss 存储被明确拒绝（而不是静默降级）", () => {
     expect(() => parseServerEnv(validEnv({ STORAGE_PROVIDER: "oss" }))).toThrow(EnvValidationError);
+  });
+
+  it("生产环境拒绝相对的 STORAGE_PATH（standalone 会切工作目录，文件会丢进镜像层）", () => {
+    // 实测踩过：standalone 的 server.js 把 cwd 切到 .next/standalone，
+    // 相对的 ./storage/uploads 就落到了镜像内部 —— 容器重建即丢，且毫无报错。
+    try {
+      parseServerEnv(validEnv({ NODE_ENV: "production", STORAGE_PATH: "./storage/uploads" }));
+      expect.unreachable("应当抛出 EnvValidationError");
+    } catch (error) {
+      expect(error).toBeInstanceOf(EnvValidationError);
+      expect((error as EnvValidationError).issues.join()).toContain("STORAGE_PATH");
+    }
+  });
+
+  it("生产环境接受绝对路径的 STORAGE_PATH（Linux 与 Windows 两种写法）", () => {
+    for (const storagePath of ["/storage/uploads", "G:/供应商智审/storage/uploads"]) {
+      const env = parseServerEnv(validEnv({ NODE_ENV: "production", STORAGE_PATH: storagePath }));
+      expect(env.STORAGE_PATH).toBe(storagePath);
+    }
   });
 
   it("一次性报出全部问题，方便部署时一轮改完", () => {

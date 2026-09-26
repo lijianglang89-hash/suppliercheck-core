@@ -1,5 +1,5 @@
 import { logoutAction } from "@/app/actions/auth";
-import { NAV_SECTIONS } from "@/lib/navigation";
+import { NavLinks } from "@/components/dashboard/nav-links";
 
 interface DashboardShellProps {
   user: { displayName: string; email: string };
@@ -10,8 +10,8 @@ interface DashboardShellProps {
 /**
  * 应用外壳：左侧导航 + 顶部信息条。
  *
- * V0.1 只开放「工作台」，其余入口按需求以「即将开放」状态呈现，
- * 不伪造可用功能。
+ * 导航项按 available 标记区分「可用」与「即将开放」，不伪造可用功能。
+ * 当前页高亮交给 NavLinks（客户端组件，需要 usePathname）。
  */
 export function DashboardShell({ user, workspace, children }: DashboardShellProps) {
   return (
@@ -29,38 +29,7 @@ export function DashboardShell({ user, workspace, children }: DashboardShellProp
           <p className="mt-0.5 text-xs text-ink-500">角色：{roleLabel(workspace.role)}</p>
         </div>
 
-        <nav aria-label="应用导航" className="px-3 pb-4">
-          {NAV_SECTIONS.map((section) => (
-            <div key={section.label} className="mt-3">
-              <p className="px-2 text-xs font-medium uppercase tracking-wider text-ink-400">
-                {section.label}
-              </p>
-              <ul className="mt-1 space-y-0.5">
-                {section.items.map((item) => (
-                  <li key={item.href}>
-                    {item.available ? (
-                      <a
-                        href={item.href}
-                        aria-current={item.href === "/dashboard" ? "page" : undefined}
-                        className="block rounded-md px-2 py-1.5 text-sm font-medium text-ink-800 hover:bg-ink-100"
-                      >
-                        {item.label}
-                      </a>
-                    ) : (
-                      <span
-                        aria-disabled="true"
-                        className="flex items-center justify-between rounded-md px-2 py-1.5 text-sm text-ink-400"
-                      >
-                        {item.label}
-                        <span className="text-[10px] uppercase tracking-wide">即将开放</span>
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </nav>
+        <NavLinks />
       </aside>
 
       <div className="flex flex-1 flex-col">

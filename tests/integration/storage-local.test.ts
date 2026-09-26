@@ -82,13 +82,18 @@ describe("本地私有存储", () => {
     }
   });
 
-  it("getSignedUrl 产出可校验的签名，且不含公开静态路径", async () => {
+  it("getSignedUrl 产出可校验的签名，且不暴露存储路径", async () => {
     const data = new Uint8Array([0x25, 0x50, 0x44, 0x46]);
     await storage.upload({ key: KEY, data });
 
     const url = new URL(await storage.getSignedUrl(KEY, { expiresInSeconds: 120 }));
-    expect(url.pathname.startsWith("/api/files/")).toBe(true);
+
+    // 必须是签名下载路由，而不是按文档 id 授权的那个路由 —— 两者语义不同。
+    expect(url.pathname.startsWith("/api/files/signed/")).toBe(true);
     expect(url.pathname).not.toContain("public");
+    // 原始存储路径（含 workspaces/ 目录层级）不得以明文出现在 URL 里。
+    expect(url.pathname).not.toContain("workspaces");
+    expect(decodeURIComponent(url.pathname)).not.toContain("/documents/");
 
     const expiresAt = Number(url.searchParams.get("expires"));
     const signature = url.searchParams.get("signature") ?? "";
@@ -96,8 +101,8 @@ describe("本地私有存储", () => {
 
     // URL 里的是 base64url 编码后的 key，解码后应与原 key 一致
     const { decodeStorageKey } = await import("@/lib/storage/signature");
-    const decodedKey = decodeStorageKey(url.pathname.replace("/api/files/", ""));
-    expect(decodedKey).toBe(KEY);
+    const token = url.pathname.slice("/api/files/signed/".length);
+    expect(decodeStorageKey(token)).toBe(KEY);
 
     expect(verifySignedKey({ key: KEY, expiresAt, signature, secret: SECRET })).toEqual({
       valid: true,

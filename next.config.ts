@@ -7,6 +7,17 @@ const nextConfig: NextConfig = {
    */
   output: "standalone",
 
+  /**
+   * 不打包进 server bundle、运行时从 node_modules 直接 require 的包。
+   *
+   * `unpdf`（内含 pdf.js 的 ESM 构建）走这条路：
+   * - 它自己是 ESM-only，被 Turbopack 打进 CJS server chunk 时容易出现互操作问题；
+   * - pdf.js 内部有大量动态加载（cMap、standard font data），
+   *   外部化之后路径解析与在 Node 里直接跑一致，行为最可预测。
+   * 代价是 standalone 产物必须带上这个包 —— Next 会自动 trace，已实测可用。
+   */
+  serverExternalPackages: ["unpdf"],
+
   /** 生产构建不做类型/ESLint 阻塞之外的额外动作；类型检查有独立脚本。 */
   typescript: {
     ignoreBuildErrors: false,

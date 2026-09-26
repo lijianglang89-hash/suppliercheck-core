@@ -45,7 +45,9 @@ server {
     ssl_protocols       TLSv1.2 TLSv1.3;
     ssl_prefer_server_ciphers off;
 
-    # 上传资料包：与 MAX_UPLOAD_BYTES 保持一致的余量
+    # 上传资料包：单文件上限 20 MB，留出 multipart 边界与头部的余量。
+    # 注意这是**单次请求**的上限。客户端按「一次一个文件」上传，
+    # 因此这个值不需要为多文件批量上传放大。
     client_max_body_size 30m;
 
     # 安全响应头（应用自身也会下发一部分，这里补齐 nginx 层）
@@ -57,6 +59,28 @@ server {
         proxy_pass http://127.0.0.1:3010;
         proxy_cache_valid 200 30d;
         add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+
+    # ------------------------------------------------------------------
+    # 上传接口：关闭请求体缓冲，让字节流直接透传给应用。
+    #
+    # 默认行为是 nginx 先把整个请求体缓冲到磁盘（client_body_temp）再转发。
+    # 对上传功能来说这等于「每个上传都要写两次盘」，而且大文件时首字节延迟明显。
+    # 关掉缓冲后，客户端 → nginx → 应用 → 应用落盘 是一条流水线，
+    # 应用自己就是流式写入的，不需要上游再缓冲一遍。
+    # ------------------------------------------------------------------
+    location /api/documents/upload {
+        proxy_pass http://127.0.0.1:3010;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_request_buffering off;
+        client_body_timeout 300s;
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
     }
 
     location / {

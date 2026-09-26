@@ -3,7 +3,7 @@
  *
  * 这里同时承担两个职责：
  * 1. 驱动侧边栏渲染；
- * 2. 明确标注哪些页面 V0.1 已经存在、哪些尚未开放 —— 避免 UI 出现死链，
+ * 2. 明确标注哪些页面已经存在、哪些尚未开放 —— 避免 UI 出现死链，
  *    也避免用户以为某个功能已经可用。
  */
 export interface NavItem {
@@ -25,6 +25,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
   {
     label: "资料审核",
     items: [
+      { label: "资料库", href: "/documents", available: true },
       { label: "供应商", href: "/suppliers", available: false },
       { label: "资料审核", href: "/reviews", available: false },
       { label: "审核报告", href: "/reports", available: false },
@@ -45,6 +46,7 @@ export const PLANNED_ROUTES = [
   "/login",
   "/register",
   "/dashboard",
+  "/documents",
   "/suppliers",
   "/reviews",
   "/reports",

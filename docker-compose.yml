@@ -73,9 +73,11 @@ services:
       AI_MODEL: ${AI_MODEL:-}
       AI_BASE_URL: ${AI_BASE_URL:-}
       STORAGE_PROVIDER: ${STORAGE_PROVIDER:-local}
-      # 容器内路径固定为 /data/uploads，与挂载卷一一对应
-      STORAGE_PATH: /data/uploads
-      MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-26214400}
+      # 容器内路径固定为 /storage/uploads，与下面的挂载卷一一对应。
+      # 宿主对应 /srv/suppliercheck/storage/uploads（data/ 留给 PostgreSQL）。
+      STORAGE_PATH: /storage/uploads
+      # 单文件上传上限：默认 20 MB（20971520 字节）
+      MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-20971520}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       # 容器内通过服务名访问数据库，不经过宿主机端口
       DATABASE_URL: postgresql://${POSTGRES_USER:-suppliercheck}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-suppliercheck}
@@ -83,7 +85,9 @@ services:
       # 只绑本机回环：外部流量必须经过宿主 nginx，避免应用直接暴露公网
       - "127.0.0.1:${APP_PORT:-3010}:3010"
     volumes:
-      - ./data/uploads:/data/uploads
+      # 宿主 /srv/suppliercheck/storage/uploads —— 供应商资料是核心数据，必须落盘持久化。
+      # 目录属主必须是 uid 1001（容器内 nextjs），由 deploy/scripts/ensure-storage.sh 保证。
+      - ./storage/uploads:/storage/uploads
     networks:
       - suppliercheck
 

@@ -8,6 +8,13 @@
       "when": 1790432301181,
       "tag": "0000_lazy_captain_flint",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790435556230,
+      "tag": "0001_plain_kang",
+      "breakpoints": true
     }
   ]
 }

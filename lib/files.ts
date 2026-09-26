@@ -23,6 +23,25 @@ export const ALLOWED_MIME_TYPES: Readonly<Record<string, string>> = {
 
 export const ALLOWED_MIME_TYPE_LIST = Object.keys(ALLOWED_MIME_TYPES);
 
+/**
+ * 扩展名 → MIME 的反向表。
+ *
+ * 用途只有一个：zip 包内条目没有 Content-Type 可信任（压缩包不会为每个条目带类型），
+ * 只能按扩展名猜测。猜出来后仍然要走**同一份白名单**，猜不出或不在白名单里的条目直接跳过，
+ * 不给「压缩包绕过类型校验」留口子。
+ */
+export const EXTENSION_TO_MIME: Readonly<Record<string, string>> = Object.freeze(
+  Object.fromEntries(
+    Object.entries(ALLOWED_MIME_TYPES).map(([mime, extension]) => [extension, mime]),
+  ),
+);
+
+/** 按扩展名猜 MIME；不在白名单内返回 undefined（调用方应据此拒绝）。 */
+export function resolveMimeForExtension(filename: string): string | undefined {
+  const extension = extractExtension(filename);
+  return extension ? EXTENSION_TO_MIME[extension] : undefined;
+}
+
 /** 文件名的最大长度（字符）。超出会被截断保留后缀。 */
 const MAX_FILENAME_LENGTH = 120;
 

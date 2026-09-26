@@ -55,8 +55,10 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# 私有上传目录。挂载卷覆盖时，容器内路径与 STORAGE_PATH 必须一致。
-RUN mkdir -p /data/uploads && chown -R nextjs:nodejs /data
+# 私有上传目录（宿主挂载卷的落点，见 docker-compose.yml）。
+# 容器内路径必须与 STORAGE_PATH 一致，否则应用会往一个没有挂载的目录写，
+# 重建容器时资料就丢了。
+RUN mkdir -p /storage/uploads && chown -R nextjs:nodejs /storage
 
 USER nextjs
 EXPOSE 3010

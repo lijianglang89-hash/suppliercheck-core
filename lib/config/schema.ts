@@ -6,6 +6,8 @@
  */
 import { z } from "zod";
 
+import { DEFAULT_MAX_UPLOAD_BYTES } from "@/lib/documents/limits";
+
 /** 已接入的 AI 供应商标识。V0.1 只实现 mock。 */
 export const AI_PROVIDER_IDS = ["mock", "openai-compatible"] as const;
 export type AIProviderId = (typeof AI_PROVIDER_IDS)[number];
@@ -14,7 +16,8 @@ export type AIProviderId = (typeof AI_PROVIDER_IDS)[number];
 export const STORAGE_PROVIDER_IDS = ["local", "oss"] as const;
 export type StorageProviderId = (typeof STORAGE_PROVIDER_IDS)[number];
 
-const MEGABYTE = 1024 * 1024;
+/** 私有存储根目录的默认值（开发环境相对路径；生产由容器挂载卷覆盖）。 */
+export const DEFAULT_STORAGE_PATH = "./storage/uploads";
 
 export const serverEnvSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -35,11 +38,20 @@ export const serverEnvSchema = z.object({
   AI_BASE_URL: z.string().url().optional(),
 
   STORAGE_PROVIDER: z.enum(STORAGE_PROVIDER_IDS).default("local"),
-  /** 私有存储根目录。绝不能位于 public/ 下。 */
-  STORAGE_PATH: z.string().min(1).default("./data/uploads"),
+  /**
+   * 私有存储根目录。绝不能位于 public/ 下。
+   *
+   * 生产环境由容器挂载卷覆盖为 /storage/uploads，宿主对应
+   * /srv/suppliercheck/storage/uploads（data/ 留给 PostgreSQL 数据目录）。
+   */
+  STORAGE_PATH: z.string().min(1).default(DEFAULT_STORAGE_PATH),
 
-  /** 单个上传文件的大小上限（字节）。 */
-  MAX_UPLOAD_BYTES: z.coerce.number().int().positive().default(25 * MEGABYTE),
+  /**
+   * 单个上传文件的大小上限（字节）。默认值取自 documents/limits，
+   * 保证「环境变量默认值」与「引擎硬上限」不会各自漂移。
+   * 即使被配得更大，也会被 documents/limits 里的硬上限夹紧。
+   */
+  MAX_UPLOAD_BYTES: z.coerce.number().int().positive().default(DEFAULT_MAX_UPLOAD_BYTES),
 
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
 
@@ -96,11 +108,30 @@ export function parseServerEnv(raw: Record<string, string | undefined>): ServerE
   if (parsed.data.STORAGE_PROVIDER === "oss") {
     crossIssues.push("STORAGE_PROVIDER: V0.1 尚未实现 oss，请保持 local");
   }
+  /**
+   * 生产环境要求 STORAGE_PATH 是绝对路径。
+   *
+   * 起因是实测发现的坑：`output: "standalone"` 的 server.js 会把进程工作目录
+   * 切到 `.next/standalone`，于是相对的 `./storage/uploads` 会解析到
+   * **镜像内部**——文件看着上传成功了，容器一重启全没，而且完全没有任何报错。
+   * 这种错必须在启动时拦下，而不是等到用户发现文件消失。
+   */
+  if (parsed.data.NODE_ENV === "production" && !isAbsolutePath(parsed.data.STORAGE_PATH)) {
+    crossIssues.push(
+      `STORAGE_PATH: 生产环境必须是绝对路径（当前 "${parsed.data.STORAGE_PATH}"）。` +
+        "standalone 产物会切换工作目录，相对路径会把文件写进镜像层，容器重建即丢失。",
+    );
+  }
   if (crossIssues.length > 0) {
     throw new EnvValidationError(crossIssues);
   }
 
   return parsed.data;
+}
+
+/** 判断是否为绝对路径。Windows 盘符形式（C:\...）也算，便于本地验证生产构建。 */
+function isAbsolutePath(value: string): boolean {
+  return value.startsWith("/") || /^[a-zA-Z]:[\\/]/.test(value);
 }
 
 /**

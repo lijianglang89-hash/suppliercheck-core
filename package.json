@@ -11,24 +11,31 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "verify:v02": "tsx scripts/verify-v02.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:check": "drizzle-kit check",
     "db:seed": "tsx db/seed.ts"
   },
   "dependencies": {
+    "busboy": "^1.6.0",
     "drizzle-orm": "^0.45.3",
     "next": "16.3.6",
     "postgres": "^3.4.9",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "saxes": "^6.0.0",
+    "unpdf": "^1.8.1",
+    "yauzl": "^3.4.0",
     "zod": "^4.6.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/busboy": "^1.5.4",
     "@types/node": "^22.20.4",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/yauzl": "^3.4.0",
     "dotenv": "^18.0.4",
     "drizzle-kit": "^0.31.11",
     "eslint": "^9",
@@ -36,6 +43,7 @@
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
     "typescript": "^5",
-    "vitest": "^5.0.2"
+    "vitest": "^5.0.2",
+    "yazl": "^3.3.1"
   }
 }
