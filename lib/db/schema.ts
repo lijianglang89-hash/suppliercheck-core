@@ -22,6 +22,9 @@ import {
   uuid,
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
+// `sql` 只用于「部分唯一索引」的 where 条件（见 suppliers 表）：
+// 「同名供应商只允许存在一个**未删除**的」用普通唯一索引表达不了。
+import { sql } from "drizzle-orm";
 
 /* ------------------------------------------------------------------ */
 /* 枚举                                                                */
@@ -108,6 +111,40 @@ export const workspaceRoleEnum = pgEnum("workspace_role", [
 /** 用户状态。 */
 export const userStatusEnum = pgEnum("user_status", ["ACTIVE", "SUSPENDED"]);
 
+/** 供应商主体的生命周期状态。归档而不是删除，历史审核报告才不会失去主体信息。 */
+export const supplierStatusEnum = pgEnum("supplier_status", ["ACTIVE", "ARCHIVED"]);
+
+/** 审核任务的执行状态。与文档解析状态机同构，但语义独立：这里跑的是规则引擎。 */
+export const reviewRunStatusEnum = pgEnum("review_run_status", [
+  "QUEUED",
+  "RUNNING",
+  "READY",
+  "FAILED",
+]);
+
+/**
+ * 审核发现的严重级别。
+ *
+ * 用数据库枚举而不是自由文本：级别会直接驱动界面排序与「是否存在阻断项」的判定，
+ * 一旦允许写进任意字符串，任何一次拼写错误都会让一条 CRITICAL 静默降级为不可见。
+ */
+export const reviewSeverityEnum = pgEnum("review_severity", [
+  "INFO",
+  "LOW",
+  "MEDIUM",
+  "HIGH",
+  "CRITICAL",
+]);
+
+/**
+ * 审核发现的来源。
+ *
+ * RULE = 确定性规则引擎产出（可复现、可解释、有证据定位）；
+ * AI   = 模型复核产出（结论性建议，不构成事实判定）。
+ * 两者在界面上必须可区分 —— 混在一起展示等于把模型措辞当成审核结论。
+ */
+export const reviewFindingSourceEnum = pgEnum("review_finding_source", ["RULE", "AI"]);
+
 /* ------------------------------------------------------------------ */
 /* 身份与租户                                                          */
 /* ------------------------------------------------------------------ */
@@ -168,6 +205,53 @@ export const workspaceMembers = pgTable(
 );
 
 /* ------------------------------------------------------------------ */
+/* 供应商主体                                                          */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 供应商主体。
+ *
+ * 为什么需要一张独立的表，而不是直接在 documents 上写个「公司名」文本：
+ * 审核的核心问题之一是「这一堆资料是不是同一个主体出的」。只有把主体变成有 id 的实体，
+ * 跨文档比对才有共同的锚点；否则每次比对都在做字符串相似度猜测。
+ *
+ * 这里刻意**不**存「审核状态」之类的派生字段 —— 那是由审核任务算出来的，
+ * 存在两处必然漂移。要看结论就去看最近一次审核任务。
+ */
+export const suppliers = pgTable(
+  "suppliers",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    /** 统一社会信用代码（18 位）。允许为空 —— 资料还没到手时不该逼用户编一个。 */
+    unifiedSocialCreditCode: text("unified_social_credit_code"),
+    contactName: text("contact_name"),
+    contactPhone: text("contact_phone"),
+    contactEmail: text("contact_email"),
+    /** 所在地，自由文本（工商注册地址常常很长，不适合结构化到省市字段）。 */
+    region: text("region"),
+    note: text("note"),
+    status: supplierStatusEnum("status").notNull().default("ACTIVE"),
+    createdBy: uuid("created_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("suppliers_workspace_idx").on(table.workspaceId),
+    // 同一工作区内不允许重名（软删除的行不占用名额，否则删掉就再也建不回来）。
+    uniqueIndex("suppliers_workspace_name_unique")
+      .on(table.workspaceId, table.name)
+      .where(sql`${table.deletedAt} is null`),
+  ],
+);
+
+/* ------------------------------------------------------------------ */
 /* 文档与处理任务                                                      */
 /* ------------------------------------------------------------------ */
 
@@ -195,6 +279,11 @@ export const documents = pgTable(
     parentDocumentId: uuid("parent_document_id").references((): AnyPgColumn => documents.id, {
       onDelete: "cascade",
     }),
+    /**
+     * 归属供应商。可空 —— 资料先上传、后归属是常见流程，
+     * 强制非空只会逼用户在还没想清楚时随便挂一个主体。
+     */
+    supplierId: uuid("supplier_id").references(() => suppliers.id, { onDelete: "set null" }),
     status: documentStatusEnum("status").notNull().default("UPLOADED"),
     processingStatus: jobStatusEnum("processing_status").notNull().default("PENDING"),
     pageCount: integer("page_count"),
@@ -210,6 +299,7 @@ export const documents = pgTable(
     index("documents_workspace_status_idx").on(table.workspaceId, table.status),
     index("documents_checksum_idx").on(table.checksum),
     index("documents_parent_idx").on(table.parentDocumentId),
+    index("documents_supplier_idx").on(table.supplierId),
     // 存储键由 workspaceId + documentId 生成，天然全局唯一；
     // 加上唯一约束后，下载路径反查文档时不可能出现歧义。
     uniqueIndex("documents_storage_path_unique").on(table.storagePath),
@@ -283,6 +373,144 @@ export const documentTexts = pgTable(
     // 一份文档只有一份提取结果；重新解析时覆盖而不是追加。
     uniqueIndex("document_texts_document_unique").on(table.documentId),
     index("document_texts_workspace_idx").on(table.workspaceId),
+  ],
+);
+
+/* ------------------------------------------------------------------ */
+/* 审核模板 / 审核任务 / 审核发现                                      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 审核模板（工作区自定义）。
+ *
+ * 内置模板是**代码常量**（lib/templates/builtin.ts），不入库 ——
+ * 它们随产品演进，入库只会让「升级产品」变成「跑数据迁移」。
+ * 本表只存用户自己造的模板，因此 owner 一定是某个工作区。
+ */
+export const reviewTemplates = pgTable(
+  "review_templates",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    description: text("description"),
+    /** 复制自哪个内置模板（仅用于展示来源，不构成外键依赖）。 */
+    basedOnKey: text("based_on_key"),
+    /** 模板配置：必备资料清单、证照到期预警天数、启用的规则集合。 */
+    config: jsonb("config").notNull().default({}),
+    createdBy: uuid("created_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("review_templates_workspace_idx").on(table.workspaceId),
+    uniqueIndex("review_templates_workspace_name_unique")
+      .on(table.workspaceId, table.name)
+      .where(sql`${table.deletedAt} is null`),
+  ],
+);
+
+/**
+ * 一次审核运行。
+ *
+ * 三条刻意的设计：
+ *
+ * 1. **模板快照**。`templateSnapshot` 把运行时用到的模板配置整份存下来。
+ *    模板是可编辑的，如果审核结果只留着 templateId，用户改一次模板就会让
+ *    **历史报告的含义随之后移** —— 那是审计场景里最不可接受的一类错误。
+ *
+ * 2. **引擎身份随结果落库**。`engineProvider` / `engineModel` / `engineMock`
+ *    记录这次结论是谁产的。mock 产出的结果永远带 engineMock = true，
+ *    界面据此必须显式标注 —— 不允许事后无法分辨。
+ *
+ * 3. **AI 复核是可选的第二遍**，`aiEnabled` 与 `aiNotes` 如实记录它到底跑没跑。
+ *    没跑就写没跑，不用「暂无 AI 建议」这类含糊措辞。
+ */
+export const reviewRuns = pgTable(
+  "review_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    supplierId: uuid("supplier_id").references(() => suppliers.id, { onDelete: "set null" }),
+    /** 展示用的模板名快照（模板可能已被改名或删除）。 */
+    templateName: text("template_name").notNull(),
+    /** 模板标识：`builtin:<key>` 或自定义模板的 uuid。 */
+    templateKey: text("template_key").notNull(),
+    templateSnapshot: jsonb("template_snapshot").notNull().default({}),
+    status: reviewRunStatusEnum("status").notNull().default("QUEUED"),
+    /** 本次审核覆盖的文档 id 列表（快照；文档后续被删除也不影响这次记录的可解释性）。 */
+    documentIds: jsonb("document_ids").notNull().default([]),
+    /** 统计口径的运行摘要，结构见 lib/reviews/types.ts 的 ReviewSummary。 */
+    summary: jsonb("summary").notNull().default({}),
+    engineProvider: text("engine_provider").notNull(),
+    engineModel: text("engine_model").notNull(),
+    engineMock: boolean("engine_mock").notNull().default(true),
+    aiEnabled: boolean("ai_enabled").notNull().default(false),
+    aiNotes: jsonb("ai_notes").notNull().default([]),
+    errorCode: text("error_code"),
+    errorMessage: text("error_message"),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    createdBy: uuid("created_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("review_runs_workspace_idx").on(table.workspaceId),
+    index("review_runs_workspace_status_idx").on(table.workspaceId, table.status),
+  ],
+);
+
+/**
+ * 审核发现（一条问题）。
+ *
+ * `severity` 与 `source` 用枚举（见文件上方说明），`ruleId` / `category` 用文本 ——
+ * 规则集会持续增长，把规则标识做成数据库枚举意味着「加一条规则 = 一次迁移」。
+ *
+ * `documentId` 用 set null：文档被删掉时，这条发现不该消失，
+ * 因为「报告里曾经指出过这个问题」是审计事实。`documentLabel` 保留当时的文件名。
+ */
+export const reviewFindings = pgTable(
+  "review_findings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    reviewRunId: uuid("review_run_id")
+      .notNull()
+      .references(() => reviewRuns.id, { onDelete: "cascade" }),
+    ruleId: text("rule_id").notNull(),
+    category: text("category").notNull(),
+    severity: reviewSeverityEnum("severity").notNull(),
+    source: reviewFindingSourceEnum("source").notNull().default("RULE"),
+    title: text("title").notNull(),
+    detail: text("detail").notNull(),
+    recommendation: text("recommendation"),
+    documentId: uuid("document_id").references(() => documents.id, { onDelete: "set null" }),
+    /** 发现被记录时的文档名，文档删除后仍可追溯。 */
+    documentLabel: text("document_label"),
+    /** 支撑该发现的原文摘录（定长截断，不存整份文件）。 */
+    evidence: text("evidence"),
+    /** 定位信息：页码、表格坐标、匹配到的正则等。结构随规则变化。 */
+    locator: jsonb("locator").notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("review_findings_run_idx").on(table.reviewRunId),
+    index("review_findings_workspace_idx").on(table.workspaceId),
+    index("review_findings_document_idx").on(table.documentId),
   ],
 );
 
@@ -429,6 +657,15 @@ export const answerReviews = pgTable(
 /* 报告与导出                                                          */
 /* ------------------------------------------------------------------ */
 
+/**
+ * ⚠️ 以下两张表（audit_reports / exports）与上方「问卷 / 问题 / 证据 / 回答」一组，
+ * 属于 V0.1 规划中的**安全问卷应答**产品线，当前版本**没有任何代码引用它们**。
+ *
+ * 保留而不是删除的原因：它们是 V0.1 已验收交付的一部分，且未来的问卷应答功能
+ * 会直接落在这套模型上；提前删除只会让那个功能上线时再补一次迁移。
+ * 与之对照，本轮实现的「供应商资料审核」用的是 review_runs / review_findings ——
+ * 判断一份资料包"缺什么、什么过期了、主体对不对"和"回答一份安全问卷"是两件事。
+ */
 export const auditReports = pgTable(
   "audit_reports",
   {
@@ -493,6 +730,13 @@ export type NewDocument = typeof documents.$inferInsert;
 export type DocumentTextRow = typeof documentTexts.$inferSelect;
 export type NewDocumentText = typeof documentTexts.$inferInsert;
 export type DocumentProcessingJob = typeof documentProcessingJobs.$inferSelect;
+export type Supplier = typeof suppliers.$inferSelect;
+export type NewSupplier = typeof suppliers.$inferInsert;
+export type ReviewTemplateRow = typeof reviewTemplates.$inferSelect;
+export type ReviewRun = typeof reviewRuns.$inferSelect;
+export type NewReviewRun = typeof reviewRuns.$inferInsert;
+export type ReviewFinding = typeof reviewFindings.$inferSelect;
+export type NewReviewFinding = typeof reviewFindings.$inferInsert;
 export type Questionnaire = typeof questionnaires.$inferSelect;
 export type Question = typeof questions.$inferSelect;
 export type Evidence = typeof evidence.$inferSelect;

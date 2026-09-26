@@ -12,7 +12,7 @@
 
 import "server-only";
 
-import { and, asc, count, desc, eq, inArray, isNull, lt, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 
 import { getDb } from "@/lib/db";
 import {
@@ -36,6 +36,7 @@ export interface DocumentListRow {
   processingStatus: DocumentRow["processingStatus"];
   pageCount: number | null;
   parentDocumentId: string | null;
+  supplierId: string | null;
   createdAt: Date;
   parserId: string | null;
   charCount: number | null;
@@ -62,6 +63,7 @@ export async function listWorkspaceDocuments(
       processingStatus: documents.processingStatus,
       pageCount: documents.pageCount,
       parentDocumentId: documents.parentDocumentId,
+      supplierId: documents.supplierId,
       createdAt: documents.createdAt,
       parserId: documentTexts.parserId,
       charCount: documentTexts.charCount,
@@ -74,6 +76,83 @@ export async function listWorkspaceDocuments(
     .where(and(eq(documents.workspaceId, workspaceId), isNull(documents.deletedAt)))
     .orderBy(desc(documents.createdAt))
     .limit(limit);
+}
+
+/** 文档 + 正文的合并视图。审核引擎只认这个形状，不直接接触存储层。 */
+export interface DocumentWithTextRow {
+  id: string;
+  workspaceId: string;
+  originalFilename: string;
+  safeFilename: string;
+  mimeType: string;
+  status: DocumentRow["status"];
+  pageCount: number | null;
+  supplierId: string | null;
+  parserId: string | null;
+  text: string | null;
+  charCount: number | null;
+  truncated: boolean | null;
+  notes: unknown;
+}
+
+/**
+ * 按 id 批量取文档及其正文。
+ *
+ * `ids` 为空数组时返回空结果而**不是**全部文档 ——
+ * 「没传筛选条件」被解释成「要全部数据」是权限事故的经典成因。
+ */
+export async function listDocumentsWithText(
+  workspaceId: string,
+  ids?: readonly string[],
+): Promise<DocumentWithTextRow[]> {
+  if (ids && ids.length === 0) return [];
+
+  const db = getDb();
+  const conditions = [eq(documents.workspaceId, workspaceId), isNull(documents.deletedAt)];
+  if (ids && ids.length > 0) conditions.push(inArray(documents.id, [...ids]));
+
+  return db
+    .select({
+      id: documents.id,
+      workspaceId: documents.workspaceId,
+      originalFilename: documents.originalFilename,
+      safeFilename: documents.safeFilename,
+      mimeType: documents.mimeType,
+      status: documents.status,
+      pageCount: documents.pageCount,
+      supplierId: documents.supplierId,
+      parserId: documentTexts.parserId,
+      text: documentTexts.text,
+      charCount: documentTexts.charCount,
+      truncated: documentTexts.truncated,
+      notes: documentTexts.notes,
+    })
+    .from(documents)
+    .leftJoin(documentTexts, eq(documentTexts.documentId, documents.id))
+    .where(and(...conditions))
+    .orderBy(asc(documents.createdAt));
+}
+
+/** 把文档挂到某个供应商（或摘下）。supplierId 传 null 表示解除归属。 */
+export async function setDocumentSupplier(
+  documentId: string,
+  supplierId: string | null,
+): Promise<void> {
+  const db = getDb();
+  await db
+    .update(documents)
+    .set({ supplierId, updatedAt: new Date() })
+    .where(and(eq(documents.id, documentId), isNull(documents.deletedAt)));
+}
+
+/** 按供应商统计资料数量，供供应商列表页展示。 */
+export async function countDocumentsBySupplier(workspaceId: string) {
+  const db = getDb();
+  return db
+    .select({ supplierId: documents.supplierId, total: count() })
+    .from(documents)
+    .where(and(eq(documents.workspaceId, workspaceId), isNull(documents.deletedAt)))
+    .groupBy(documents.supplierId);
 }
 
 export async function findDocumentById(documentId: string): Promise<DocumentRow | undefined> {
@@ -284,7 +363,9 @@ export async function startJob(input: StartJobInput): Promise<string> {
       jobType: input.jobType,
       status: "RUNNING",
       attempt: 1,
-      startedAt: new Date(),
+      // 与审核任务同一条纪律：生命周期时间戳一律用数据库时钟（now()），
+      // 避免「完成时间早于开始时间」这种由时钟漂移造成的假象。
+      startedAt: sql`now()`,
     })
     .returning({ id: documentProcessingJobs.id });
 
@@ -307,8 +388,8 @@ export async function finishJob(input: FinishJobInput): Promise<void> {
       status: input.status,
       errorCode: input.errorCode ?? null,
       errorMessage: input.errorMessage ?? null,
-      finishedAt: new Date(),
-      updatedAt: new Date(),
+      finishedAt: sql`now()`,
+      updatedAt: sql`now()`,
     })
     .where(eq(documentProcessingJobs.id, input.jobId));
 }

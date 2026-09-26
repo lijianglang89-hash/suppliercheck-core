@@ -7,9 +7,11 @@ import { NAV_SECTIONS } from "@/lib/navigation";
 /**
  * 侧边栏导航。
  *
- * 单独做成客户端组件的原因只有一个：需要 `usePathname()` 来标记当前页。
- * V0.1 里这段逻辑写死了 `/dashboard`，加了资料库之后必须按路径高亮，
- * 否则用户在 /documents 上看到的是工作台被选中。
+ * 做成客户端组件的唯一原因：需要 `usePathname()` 来标记当前页。
+ * 这一点在加了多个顶级路由之后变得必要 —— 写死 `/dashboard` 会让用户在
+ * /reviews 上看到「工作台」被高亮。
+ *
+ * 这里不再有「即将开放」的禁用项：导航只列真实可用的页面（理由见 lib/navigation.ts）。
  */
 export function NavLinks() {
   const pathname = usePathname();
@@ -23,30 +25,21 @@ export function NavLinks() {
           </p>
           <ul className="mt-1 space-y-0.5">
             {section.items.map((item) => {
-              const active = item.available && isActive(pathname, item.href);
+              const active = isActive(pathname, item.href);
               return (
                 <li key={item.href}>
-                  {item.available ? (
-                    <a
-                      href={item.href}
-                      aria-current={active ? "page" : undefined}
-                      className={
-                        active
-                          ? "block rounded-md bg-brand-50 px-2 py-1.5 text-sm font-medium text-brand-700"
-                          : "block rounded-md px-2 py-1.5 text-sm font-medium text-ink-800 hover:bg-ink-100"
-                      }
-                    >
-                      {item.label}
-                    </a>
-                  ) : (
-                    <span
-                      aria-disabled="true"
-                      className="flex items-center justify-between rounded-md px-2 py-1.5 text-sm text-ink-400"
-                    >
-                      {item.label}
-                      <span className="text-[10px] uppercase tracking-wide">即将开放</span>
-                    </span>
-                  )}
+                  <a
+                    href={item.href}
+                    title={item.hint}
+                    aria-current={active ? "page" : undefined}
+                    className={
+                      active
+                        ? "block rounded-md bg-brand-50 px-2 py-1.5 text-sm font-medium text-brand-700"
+                        : "block rounded-md px-2 py-1.5 text-sm font-medium text-ink-800 hover:bg-ink-100"
+                    }
+                  >
+                    {item.label}
+                  </a>
                 </li>
               );
             })}

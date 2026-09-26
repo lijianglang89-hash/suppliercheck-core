@@ -22,6 +22,7 @@ export interface DocumentDto {
   processingStatus: string;
   pageCount: number | null;
   parentDocumentId: string | null;
+  supplierId: string | null;
   createdAt: string;
   /** 以下字段仅列表接口返回。 */
   extraction?: {
@@ -46,6 +47,7 @@ export function serializeDocument(document: DocumentRow): DocumentDto {
     processingStatus: document.processingStatus,
     pageCount: document.pageCount,
     parentDocumentId: document.parentDocumentId,
+    supplierId: document.supplierId,
     createdAt: document.createdAt.toISOString(),
   };
 }
@@ -63,6 +65,7 @@ export function serializeListRow(row: DocumentListRow): DocumentDto {
     processingStatus: row.processingStatus,
     pageCount: row.pageCount,
     parentDocumentId: row.parentDocumentId,
+    supplierId: row.supplierId,
     createdAt: row.createdAt.toISOString(),
     ...(row.parserId
       ? {

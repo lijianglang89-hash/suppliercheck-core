@@ -1,5 +1,6 @@
 import { logoutAction } from "@/app/actions/auth";
 import { NavLinks } from "@/components/dashboard/nav-links";
+import { siteConfig } from "@/lib/site";
 
 interface DashboardShellProps {
   user: { displayName: string; email: string };
@@ -10,15 +11,23 @@ interface DashboardShellProps {
 /**
  * 应用外壳：左侧导航 + 顶部信息条。
  *
- * 导航项按 available 标记区分「可用」与「即将开放」，不伪造可用功能。
- * 当前页高亮交给 NavLinks（客户端组件，需要 usePathname）。
+ * 站点名一律用**全称**（`siteConfig.name`），不用简称 ——
+ * 侧栏是用户每天看到的第一屏，产品叫什么应该在这里说清楚。
+ * 空间不够时换行，而不是偷偷把名字截短。
  */
 export function DashboardShell({ user, workspace, children }: DashboardShellProps) {
   return (
     <div className="flex min-h-screen flex-col lg:flex-row">
       <aside className="border-b border-ink-200 bg-white lg:w-64 lg:shrink-0 lg:border-b-0 lg:border-r">
-        <div className="flex h-16 items-center border-b border-ink-100 px-5">
-          <span className="text-base font-semibold tracking-tight text-ink-900">供应商智审</span>
+        <div className="flex min-h-16 items-center border-b border-ink-100 px-5 py-3">
+          <a href="/dashboard" className="block">
+            <span className="block text-[15px] font-semibold leading-snug tracking-tight text-ink-900">
+              {siteConfig.name}
+            </span>
+            <span className="mt-0.5 block text-[11px] text-ink-400">
+              {siteConfig.latinName} · 供应商资料审核
+            </span>
+          </a>
         </div>
 
         <div className="px-5 py-4">

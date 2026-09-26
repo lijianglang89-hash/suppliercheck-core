@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { assignDocumentSupplierAction } from "@/app/actions/suppliers";
 import { AutoRefresh } from "@/components/documents/auto-refresh";
 import { ReprocessButton } from "@/components/documents/reprocess-button";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { requireUser, requireWorkspaceAccess } from "@/lib/auth/guards";
 import { getEnv } from "@/lib/config/server-env";
 import { findDocumentById, findDocumentText } from "@/lib/documents/repository";
@@ -16,6 +18,7 @@ import {
 } from "@/lib/documents/labels";
 import { formatBytes, isUuid } from "@/lib/files";
 import { getStorageProvider } from "@/lib/storage";
+import { listWorkspaceSuppliers } from "@/lib/suppliers/repository";
 
 export const dynamic = "force-dynamic";
 
@@ -34,10 +37,15 @@ export default async function DocumentDetailPage({
   if (!document) notFound();
 
   // 授权依据是数据库里这行的 workspaceId —— 不是 URL 里的任何东西。
-  await requireWorkspaceAccess(document.workspaceId, { minimumRole: "VIEWER" });
+  const { workspace: authorized } = await requireWorkspaceAccess(document.workspaceId, {
+    minimumRole: "VIEWER",
+  });
   void user;
 
-  const extraction = await findDocumentText(documentId);
+  const [extraction, suppliers] = await Promise.all([
+    findDocumentText(documentId),
+    listWorkspaceSuppliers(authorized.id, { includeArchived: true }),
+  ]);
 
   // 签名 URL 演示：仍然需要登录会话才能用（见 /api/files/signed 的说明）。
   const signedUrl = await getStorageProvider().getSignedUrl(document.storagePath, {
@@ -87,6 +95,16 @@ export default async function DocumentDetailPage({
             浏览器预览（PDF / 图片）
           </a>
           {document.status === "FAILED" && <ReprocessButton documentId={document.id} />}
+          {(extraction?.charCount ?? 0) > 0 ? (
+            <Link
+              href={`/reviews?document=${document.id}${
+                document.supplierId ? `&supplier=${document.supplierId}` : ""
+              }`}
+              className="rounded border border-transparent bg-brand-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-800"
+            >
+              用这份资料发起审核
+            </Link>
+          ) : null}
           <AutoRefresh active={isPendingStatus(document.status)} />
         </div>
 
@@ -96,6 +114,54 @@ export default async function DocumentDetailPage({
           {signedUrl}
         </p>
       </header>
+
+      <section
+        aria-labelledby="supplier-heading"
+        className="rounded-lg border border-ink-200 bg-white px-5 py-4"
+      >
+        <h2 id="supplier-heading" className="text-sm font-semibold text-ink-900">
+          归属供应商
+        </h2>
+        <p className="mt-1 text-xs text-ink-500">
+          指定后，审核时会在「主体一致性」里核对这份资料上出现的主体名称。不指定也能审核。
+        </p>
+
+        {suppliers.length === 0 ? (
+          <p className="mt-3 text-xs text-ink-500">
+            还没有登记供应商。先到
+            <Link href="/suppliers" className="mx-1 text-brand-700 hover:underline">
+              供应商
+            </Link>
+            登记一个。
+          </p>
+        ) : (
+          <form action={assignDocumentSupplierAction} className="mt-3 flex flex-wrap items-end gap-3">
+            <input type="hidden" name="documentId" value={document.id} />
+            <div className="min-w-[240px]">
+              <label htmlFor="supplierId" className="block text-xs font-medium text-ink-700">
+                供应商
+              </label>
+              <select
+                id="supplierId"
+                name="supplierId"
+                defaultValue={document.supplierId ?? ""}
+                className="mt-1.5 block w-full rounded-md border border-ink-300 bg-white px-3 py-2 text-sm text-ink-900 focus:border-brand-600 focus:outline-none"
+              >
+                <option value="">不归属任何供应商</option>
+                {suppliers.map((supplier) => (
+                  <option key={supplier.id} value={supplier.id}>
+                    {supplier.name}
+                    {supplier.status !== "ACTIVE" ? "（已归档）" : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <SubmitButton variant="secondary" pendingText="保存中…">
+              保存归属
+            </SubmitButton>
+          </form>
+        )}
+      </section>
 
       <section className="rounded-lg border border-ink-200 bg-white">
         <div className="flex items-center justify-between border-b border-ink-100 px-5 py-3">

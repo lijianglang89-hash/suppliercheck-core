@@ -1,0 +1,363 @@
+/**
+ * 审核服务层（编排 + 状态机）。
+ *
+ * 与 `lib/documents/service.ts` 同构，同样守三条规矩：
+ *
+ * 1. **认领后再跑。** 状态先原子地翻到 RUNNING，再进串行队列。
+ *    连点两次「重新运行」只有一次会真正干活，否则发现会被写两遍。
+ *
+ * 2. **状态只由这一层推进。** 路由 / Server Action 一律不许直接改 review_runs.status。
+ *
+ * 3. **绝不伪造审核结论。** 一条发现都没有 ≠ 审核通过 ——
+ *    摘要里必须带上覆盖度说明（查了几份、几份没读到正文、跑了几条规则）。
+ *    一份只读了 1/10 份资料的报告，如果长得和全覆盖的报告一样，那它就是在撒谎。
+ *
+ * 另外这里承担**跨租户的最后一道闸门**：documentIds / supplierId / templateKey
+ * 全部来自浏览器，每一个都必须回库确认属于当前工作区。任何一个漏检，
+ * 攻击者就能用别人的资料生成一份报告，或读到别人的模板配置。
+ */
+import "server-only";
+
+import { errors, toAppError } from "@/lib/errors";
+import { isUuid } from "@/lib/files";
+import { getAIProvider } from "@/lib/ai";
+import { logger } from "@/lib/logger";
+import { MAX_ERROR_MESSAGE_CHARS } from "@/lib/jobs/limits";
+import { runExclusive, withTimeout } from "@/lib/jobs/serial-queue";
+import { listDocumentsWithText, type DocumentWithTextRow } from "@/lib/documents/repository";
+import { findSuppliersByIds } from "@/lib/suppliers/repository";
+import { resolveTemplate } from "@/lib/templates/service";
+import { parseTemplateConfig } from "@/lib/templates/types";
+
+import { runReviewEngine } from "./engine";
+import {
+  MAX_DOCUMENTS_PER_RUN,
+  MAX_RUN_NAME_CHARS,
+  MAX_TOTAL_REVIEW_CHARS,
+  MAX_REVIEW_FINDINGS,
+  REVIEW_STALE_THRESHOLD_MS,
+  REVIEW_TIMEOUT_MS,
+} from "./limits";
+import {
+  claimReviewRun,
+  createReviewRun,
+  findReviewRunById,
+  markReviewRunFailed,
+  markReviewRunReady,
+  replaceRunFindings,
+} from "./repository";
+import type { ReviewDocumentInput } from "./types";
+import type { NewReviewFinding, ReviewRun } from "@/lib/db/schema";
+
+/* ------------------------------------------------------------------ */
+/* 创建                                                               */
+/* ------------------------------------------------------------------ */
+
+export interface CreateReviewRunParams {
+  workspaceId: string;
+  userId: string;
+  templateKey: string;
+  supplierId?: string | null;
+  documentIds: readonly string[];
+  name?: string | null;
+}
+
+export async function createReviewRunAndEnqueue(params: CreateReviewRunParams): Promise<ReviewRun> {
+  if (!isUuid(params.workspaceId)) {
+    throw errors.validation("workspaceId 必须是 UUID。");
+  }
+
+  const documentIds = dedupeUuids(params.documentIds);
+  if (documentIds.length === 0) {
+    throw errors.validation("请至少选择一份资料再开始审核。");
+  }
+  if (documentIds.length > MAX_DOCUMENTS_PER_RUN) {
+    throw errors.validation(
+      `一次审核最多纳入 ${MAX_DOCUMENTS_PER_RUN} 份资料，请减少选择范围后重试。`,
+    );
+  }
+
+  // 模板：内置从代码常量取，自定义必须属于本工作区（resolveTemplate 内部校验）。
+  const template = await resolveTemplate(params.workspaceId, params.templateKey);
+
+  // 供应商：必须属于本工作区。不属于就当作不存在，不区分「不存在」与「别人的」。
+  let supplierName: string | null = null;
+  const supplierId = params.supplierId && isUuid(params.supplierId) ? params.supplierId : null;
+  if (supplierId) {
+    const [supplier] = await findSuppliersByIds(params.workspaceId, [supplierId]);
+    if (!supplier) {
+      throw errors.notFound("没有找到对应的供应商。");
+    }
+    supplierName = supplier.name;
+  }
+
+  // 资料：逐个回库确认归属。数量对不上就报 404，不回传「哪几个不属于你」。
+  const rows = await listDocumentsWithText(params.workspaceId, documentIds);
+  if (rows.length !== documentIds.length) {
+    throw errors.notFound("部分资料不存在或不属于当前工作区，请刷新页面后重试。");
+  }
+
+  const provider = getAIProvider();
+  const name = buildRunName(params.name, supplierName, template.name);
+
+  const run = await createReviewRun({
+    workspaceId: params.workspaceId,
+    name,
+    supplierId,
+    templateName: template.name,
+    templateKey: template.key,
+    templateSnapshot: {
+      // 存的是**已校验**的配置对象，不是表单原文。
+      ...(template.config as unknown as Record<string, unknown>),
+      __source: template.source,
+    },
+    documentIds,
+    engineProvider: provider.id,
+    engineModel: provider.model,
+    engineMock: provider.isMock,
+    createdBy: params.userId,
+  });
+
+  await enqueueReviewRun(run.id);
+  logger.info("已创建审核任务", {
+    reviewRunId: run.id,
+    workspaceId: params.workspaceId,
+    templateKey: template.key,
+    documentCount: documentIds.length,
+  });
+
+  return run;
+}
+
+function dedupeUuids(values: readonly string[]): string[] {
+  const seen = new Set<string>();
+  for (const value of values) {
+    if (typeof value === "string" && isUuid(value)) seen.add(value);
+  }
+  return [...seen];
+}
+
+function buildRunName(
+  requested: string | null | undefined,
+  supplierName: string | null,
+  templateName: string,
+): string {
+  const trimmed = (requested ?? "").trim();
+  if (trimmed.length > 0) {
+    return trimmed.slice(0, MAX_RUN_NAME_CHARS);
+  }
+  const subject = supplierName ?? "未命名主体";
+  const stamp = new Date().toLocaleString("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  return `${subject} · ${templateName} · ${stamp}`.slice(0, MAX_RUN_NAME_CHARS);
+}
+
+/* ------------------------------------------------------------------ */
+/* 触发                                                               */
+/* ------------------------------------------------------------------ */
+
+export interface EnqueueReviewResult {
+  queued: boolean;
+  reason?: "not_found" | "already_running";
+}
+
+/**
+ * 触发一次审核（或重新运行）。
+ *
+ * 允许重新认领 READY 的任务 —— 「重新运行」是明确的产品语义：
+ * 资料补齐了就想再跑一次。findings 会被整体替换（见 replaceRunFindings），
+ * 因此不会出现新旧结论混在一起。
+ */
+export async function enqueueReviewRun(runId: string): Promise<EnqueueReviewResult> {
+  if (!isUuid(runId)) return { queued: false, reason: "not_found" };
+
+  const claimed = await claimReviewRun(runId, REVIEW_STALE_THRESHOLD_MS);
+  if (!claimed) {
+    const existing = await findReviewRunById(runId);
+    if (!existing) return { queued: false, reason: "not_found" };
+    return { queued: false, reason: "already_running" };
+  }
+
+  // 不 await：调用方只负责排队，审核本身在串行队列里跑。
+  void runExclusive(() => executeReviewRun(claimed)).catch((error: unknown) => {
+    logger.error("审核任务异常退出", { reviewRunId: runId, error });
+  });
+
+  return { queued: true };
+}
+
+/* ------------------------------------------------------------------ */
+/* 执行                                                               */
+/* ------------------------------------------------------------------ */
+
+/** 真正干活的地方。**必须在串行队列中运行**（与文档解析共用同一条队列，见 lib/jobs）。 */
+export async function executeReviewRun(run: ReviewRun): Promise<void> {
+  const log = logger.child({ reviewRunId: run.id, workspaceId: run.workspaceId });
+
+  try {
+    const documentIds = toStringArray(run.documentIds);
+    const rows = await listDocumentsWithText(run.workspaceId, documentIds);
+    const { documents, coverageNotes } = buildDocumentInputs(rows);
+
+    const supplier = await loadSupplierContext(run.workspaceId, run.supplierId);
+    const config = parseTemplateConfig(run.templateSnapshot);
+    const provider = getAIProvider();
+
+    const outcome = await withTimeout(
+      runReviewEngine({
+        documents,
+        config,
+        supplierName: supplier.name,
+        supplierUscc: supplier.uscc,
+        now: new Date(),
+        maxFindings: MAX_REVIEW_FINDINGS,
+      }),
+      REVIEW_TIMEOUT_MS,
+      () => errors.internal(`审核执行超时（${REVIEW_TIMEOUT_MS} 毫秒），已中止。`),
+    );
+
+    const findings: NewReviewFinding[] = outcome.findings.map((finding) => ({
+      workspaceId: run.workspaceId,
+      reviewRunId: run.id,
+      ruleId: finding.ruleId,
+      category: finding.category,
+      severity: finding.severity,
+      source: finding.category === "AI" ? "AI" : "RULE",
+      title: finding.title,
+      detail: finding.detail,
+      recommendation: finding.recommendation ?? null,
+      documentId: finding.documentId ?? null,
+      documentLabel: finding.documentLabel ?? null,
+      evidence: finding.evidence ?? null,
+      locator: finding.locator ?? {},
+    }));
+
+    await replaceRunFindings(run.id, run.workspaceId, findings);
+
+    await markReviewRunReady(
+      run.id,
+      {
+        ...outcome.summary,
+        // 引擎不知道这次到底取到了哪些文档，覆盖度说明由服务层补齐后合并。
+        coverageNotes: [...coverageNotes, ...outcome.summary.coverageNotes],
+      } as unknown as Record<string, unknown>,
+      { enabled: outcome.ai.enabled, notes: outcome.ai.notes },
+      { provider: provider.id, model: provider.model, mock: provider.isMock },
+    );
+
+    log.info("审核完成", {
+      findingCount: outcome.findings.length,
+      blockingCount: outcome.summary.blockingCount,
+      documentCount: outcome.summary.documentCount,
+      readableDocumentCount: outcome.summary.readableDocumentCount,
+    });
+  } catch (error) {
+    const appError = toAppError(error);
+    await markReviewRunFailed(
+      run.id,
+      appError.code,
+      appError.message.slice(0, MAX_ERROR_MESSAGE_CHARS),
+    ).catch((markError: unknown) => {
+      log.error("标记审核失败状态时出错", { markError });
+    });
+    log.error("审核执行失败", { code: appError.code, error: appError.message });
+  }
+}
+
+/** 允许重新运行一个已完成任务（供服务端调用，不做授权 —— 授权在调用方）。 */
+export async function rerunReview(runId: string): Promise<EnqueueReviewResult> {
+  return enqueueReviewRun(runId);
+}
+
+/* ------------------------------------------------------------------ */
+/* 输入装配                                                           */
+/* ------------------------------------------------------------------ */
+
+interface BuildDocumentInputsResult {
+  documents: ReviewDocumentInput[];
+  /** 服务层特有的覆盖度说明（引擎看不到的部分）。 */
+  coverageNotes: string[];
+}
+
+/**
+ * 把数据库行拼成引擎输入，并施加**总字符预算**。
+ *
+ * 预算用尽时后续文档被截断并把 truncated 置为 true —— 于是规则会如实报出
+ * 「正文超出提取上限」而不是静默少看内容。这里刻意不复用文档解析时的
+ * `truncated`（那是提取器的事实），而是产生一个新的、属于本次审核的覆盖度事实。
+ */
+function buildDocumentInputs(rows: DocumentWithTextRow[]): BuildDocumentInputsResult {
+  const documents: ReviewDocumentInput[] = [];
+  const coverageNotes: string[] = [];
+  let budget = MAX_TOTAL_REVIEW_CHARS;
+  let budgetExhausted = 0;
+
+  for (const row of rows) {
+    const fullText = row.text ?? "";
+    const originalTruncated = row.truncated ?? false;
+    let text = fullText;
+    let truncated = originalTruncated;
+
+    if (text.length > budget) {
+      text = text.slice(0, Math.max(0, budget));
+      truncated = true;
+      budgetExhausted += 1;
+    }
+    budget -= text.length;
+
+    documents.push({
+      id: row.id,
+      label: row.safeFilename,
+      originalFilename: row.originalFilename,
+      mimeType: row.mimeType,
+      status: row.status,
+      parserId: row.parserId,
+      text,
+      charCount: text.length,
+      truncated,
+      pageCount: row.pageCount,
+      notes: toStringArray(row.notes),
+    });
+  }
+
+  if (budgetExhausted > 0) {
+    coverageNotes.push(
+      `有 ${budgetExhausted} 份资料因超出本次审核的正文预算被截断，超出部分未参与审核。`,
+    );
+  }
+
+  const missing = rows.length;
+  if (missing === 0) {
+    coverageNotes.push("本次审核没有取到任何资料记录（可能已被删除）。");
+  }
+
+  return { documents, coverageNotes };
+}
+
+/**
+ * 取出申报主体的名称与信用代码。
+ *
+ * 两个都取而不是只取名称：「出现多个主体代码」这条规则要靠申报主体的代码
+ * 才能区分「资料里混进了别人」和「资料里本来就有第三方机构的代码」——
+ * 后者在中国的检测报告、验资报告里几乎必然出现，按前者处理就是高频误报。
+ */
+async function loadSupplierContext(
+  workspaceId: string,
+  supplierId: string | null,
+): Promise<{ name: string | null; uscc: string | null }> {
+  if (!supplierId) return { name: null, uscc: null };
+  const [supplier] = await findSuppliersByIds(workspaceId, [supplierId]);
+  if (!supplier) return { name: null, uscc: null };
+  return { name: supplier.name, uscc: supplier.unifiedSocialCreditCode ?? null };
+}
+
+function toStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === "string");
+}

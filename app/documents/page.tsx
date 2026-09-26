@@ -16,6 +16,8 @@ import {
   parserLabel,
 } from "@/lib/documents/labels";
 import { formatBytes } from "@/lib/files";
+import { MAX_DOCUMENTS_PER_RUN } from "@/lib/reviews/limits";
+import { listWorkspaceSuppliers } from "@/lib/suppliers/repository";
 
 export const dynamic = "force-dynamic";
 
@@ -34,8 +36,13 @@ export default async function DocumentsPage() {
     minimumRole: "VIEWER",
   });
 
-  const rows = await listWorkspaceDocuments(authorized.id);
+  const [rows, suppliers] = await Promise.all([
+    listWorkspaceDocuments(authorized.id),
+    listWorkspaceSuppliers(authorized.id, { includeArchived: true }),
+  ]);
   const env = getEnv();
+
+  const supplierNameById = new Map(suppliers.map((supplier) => [supplier.id, supplier.name]));
 
   const counts = {
     total: rows.length,
@@ -43,6 +50,12 @@ export default async function DocumentsPage() {
     failed: rows.filter((row) => row.status === "FAILED").length,
     pending: rows.filter((row) => isPendingStatus(row.status)).length,
   };
+
+  // 「已解析」= 状态 READY 且确实提取到了正文。只按状态算会把「PDF 没有文本层」
+  // 这类零字符的结果也算进来，于是用户点进去发现这份资料根本没参与审核。
+  const readyIds = rows
+    .filter((row) => row.status === "READY" && (row.charCount ?? 0) > 0)
+    .map((row) => row.id);
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -65,6 +78,43 @@ export default async function DocumentsPage() {
 
       <DocumentUploader workspaceId={authorized.id} maxBytes={env.MAX_UPLOAD_BYTES} />
 
+      {/*
+        上传之后必须有下一步。
+        「上传成功」不是终点，用户真正的目标是拿到审核结论 ——
+        只有一个上传框的页面等于把人丢在半路。
+      */}
+      <section className="rounded-lg border border-brand-200 bg-brand-50 px-5 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-ink-900">下一步：发起审核</h2>
+            <p className="mt-1 text-xs text-ink-600">
+              {readyIds.length > 0
+                ? `当前有 ${readyIds.length} 份资料已提取到正文，可以立即发起审核。`
+                : "还没有已解析完成的资料。解析通常需要几秒，完成后这里会出现入口。"}
+            </p>
+          </div>
+          {readyIds.length > 0 ? (
+            <div className="flex items-center gap-2">
+              <Link
+                href="/reviews"
+                className="rounded-md border border-ink-300 bg-white px-3 py-2 text-sm font-medium text-ink-700 hover:bg-ink-50"
+              >
+                自行选择资料
+              </Link>
+              <Link
+                href={`/reviews?${readyIds
+                  .slice(0, MAX_DOCUMENTS_PER_RUN)
+                  .map((id) => `document=${id}`)
+                  .join("&")}`}
+                className="rounded-md border border-transparent bg-brand-700 px-3 py-2 text-sm font-medium text-white hover:bg-brand-800"
+              >
+                审核已解析的 {Math.min(readyIds.length, MAX_DOCUMENTS_PER_RUN)} 份
+              </Link>
+            </div>
+          ) : null}
+        </div>
+      </section>
+
       <section aria-labelledby="list-heading" className="rounded-lg border border-ink-200 bg-white">
         <div className="flex items-center justify-between border-b border-ink-100 px-5 py-3">
           <h2 id="list-heading" className="text-sm font-semibold text-ink-900">
@@ -79,10 +129,11 @@ export default async function DocumentsPage() {
           </p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] border-collapse text-sm">
+            <table className="w-full min-w-[840px] border-collapse text-sm">
               <thead>
                 <tr className="border-b border-ink-100 text-left text-xs uppercase tracking-wide text-ink-500">
                   <th className="px-5 py-2 font-medium">文件名</th>
+                  <th className="px-3 py-2 font-medium">归属供应商</th>
                   <th className="px-3 py-2 font-medium">类型</th>
                   <th className="px-3 py-2 font-medium">大小</th>
                   <th className="px-3 py-2 font-medium">状态</th>
@@ -107,6 +158,19 @@ export default async function DocumentsPage() {
                           <span className="mt-0.5 block text-xs text-ink-400">
                             来自压缩包 · {row.originalFilename}
                           </span>
+                        )}
+                      </td>
+                      <td className="max-w-[160px] px-3 py-3 text-xs text-ink-600">
+                        {row.supplierId ? (
+                          <Link
+                            href={`/suppliers`}
+                            className="block truncate hover:text-brand-700"
+                            title={supplierNameById.get(row.supplierId) ?? ""}
+                          >
+                            {supplierNameById.get(row.supplierId) ?? "主体已删除"}
+                          </Link>
+                        ) : (
+                          <span className="text-ink-400">未归属</span>
                         )}
                       </td>
                       <td className="px-3 py-3 text-ink-600">{mimeTypeLabel(row.mimeType)}</td>
@@ -141,6 +205,16 @@ export default async function DocumentsPage() {
                           >
                             下载
                           </a>
+                          {row.status === "READY" && (row.charCount ?? 0) > 0 ? (
+                            <Link
+                              href={`/reviews?document=${row.id}${
+                                row.supplierId ? `&supplier=${row.supplierId}` : ""
+                              }`}
+                              className="rounded border border-brand-200 bg-brand-50 px-2 py-1 text-xs font-medium text-brand-700 hover:bg-brand-100"
+                            >
+                              发起审核
+                            </Link>
+                          ) : null}
                           {row.status === "FAILED" && <ReprocessButton documentId={row.id} />}
                         </div>
                       </td>

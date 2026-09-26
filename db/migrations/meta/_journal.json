@@ -15,6 +15,13 @@
       "when": 1790435556230,
       "tag": "0001_plain_kang",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790445943448,
+      "tag": "0002_icy_spyke",
+      "breakpoints": true
     }
   ]
 }

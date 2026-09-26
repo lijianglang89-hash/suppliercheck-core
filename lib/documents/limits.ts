@@ -110,10 +110,8 @@ export const ZIP_ALLOW_NESTED = false;
 export const PARSE_TIMEOUT_MS = 120_000;
 
 /**
- * 任务停留在 RUNNING 超过这个时长即视为「僵死」（进程重启等），
- * 允许被重新触发，避免文档永远卡在 PROCESSING。
+ * 任务僵死阈值与错误信息长度上限已移到 `lib/jobs/limits.ts` ——
+ * 它们是进程级约定，文档解析与审核引擎必须用同一套值。
+ * 这里 re-export 是为了保持既有 import 不变。
  */
-export const STALE_JOB_THRESHOLD_MS = 10 * 60 * 1000;
-
-/** 落库的错误信息长度上限，避免把整个异常堆栈塞进数据库。 */
-export const MAX_ERROR_MESSAGE_CHARS = 500;
+export { MAX_ERROR_MESSAGE_CHARS, STALE_JOB_THRESHOLD_MS } from "@/lib/jobs/limits";

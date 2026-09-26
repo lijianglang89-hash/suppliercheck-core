@@ -72,3 +72,17 @@ export async function ensureWorkspaceForUser(userId: string): Promise<ActiveWork
     return { id: workspace.id, name: workspace.name, slug: workspace.slug, role: "OWNER" };
   });
 }
+
+/**
+ * 重命名工作区。
+ *
+ * 这里不校验调用者角色 —— 角色判定统一由守卫层完成（见 lib/auth/guards.ts），
+ * 数据访问层只负责"改这一行"。判据只有一份，才不会两边不一致。
+ */
+export async function renameWorkspace(workspaceId: string, name: string): Promise<void> {
+  const db = getDb();
+  await db
+    .update(workspaces)
+    .set({ name, updatedAt: new Date() })
+    .where(and(eq(workspaces.id, workspaceId), isNull(workspaces.deletedAt)));
+}
