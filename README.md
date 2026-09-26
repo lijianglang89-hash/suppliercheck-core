@@ -421,11 +421,14 @@ sudo nginx -t && sudo systemctl reload nginx
 **阶段二 · 签发证书并切到 HTTPS**
 
 ```bash
-# 演练（链路上的问题应该在这里暴露，别去撞 ACME 限额）
-sudo bash deploy/scripts/enable-https.sh --email you@example.com --staging
-# 演练通过后签发正式证书
+# 演练：走完整 ACME 流程，但不签发、不落盘、不改 nginx（certbot --dry-run）
+sudo bash deploy/scripts/enable-https.sh --email you@example.com --rehearse
+# 演练通过后正式签发并切到 443
 sudo bash deploy/scripts/enable-https.sh --email you@example.com --prod
 ```
+
+演练刻意用 `--dry-run` 而不是「真的签一张 staging 证书」：后者会把不受信任的证书写到磁盘，
+而脚本紧接着就会切到 443，中间必然出现一个「浏览器报警告」的窗口。`--dry-run` 没有这个副作用。
 
 脚本做的事：校验 DNS → 校验阶段一配置在位 → **实测 HTTP-01 路径可达（不消耗 ACME 配额）**
 → certbot 签发（带 `--deploy-hook` 续期后自动 reload）→ 用模板渲染 443 配置替换阶段一
@@ -436,6 +439,18 @@ sudo bash deploy/scripts/enable-https.sh --email you@example.com --prod
 
 > ⚠️ 证书与 443 **必须一起上线**：只加 443 块而 `ssl_certificate` 指向不存在的文件，
 > `nginx -t` 会失败，reload 就做不了；反过来只签证书不加 443 块，证书也不会被用到。
+
+> ⚠️ **`http2 on;` 需要 nginx ≥ 1.25.1。** 旧版（实测 1.22.1）遇到它会直接
+> `[emerg] unknown directive "http2"` 拒绝加载整个配置 —— 不是警告，是硬失败，
+> 而且**会导致 reload 失败**。兼容写法是旧的 `listen 443 ssl http2;` ——
+> 它在新版上只产生 deprecation warning，所以兼容面更广，模板里用的是这一种。
+
+> ⚠️ **Let's Encrypt 的二次校验偶发超时是已知现象**，报错形如
+> `During secondary validation: ... Timeout during connect (likely firewall problem)`。
+> LE 会从全球多个节点分别校验，主校验通过而某个二级节点超时就会失败。
+> **看到这个报错先别急着改防火墙** —— 先用 `https://check-host.net/check-http?host=<URL>`
+> 从 20 个全球节点实测一次 HTTP 可达性（免费、免注册、有 JSON API）。
+> 如果全球都通，直接重试即可；失败配额是每账号每域名每小时 5 次，重试一两次完全安全。
 
 ---
 

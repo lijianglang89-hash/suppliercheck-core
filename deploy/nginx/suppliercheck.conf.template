@@ -35,9 +35,12 @@ server {
 
 # --- 443：应用入口 ---------------------------------------------------------
 server {
-    listen 443 ssl;
-    listen [::]:443 ssl;
-    http2 on;
+    # ⚠️ 用 `listen ... http2` 而不是 nginx 1.25.1+ 的 `http2 on;`。
+    # 旧版（实测 nginx 1.22.1）遇到 `http2 on;` 会直接
+    # [emerg] unknown directive "http2" 拒绝加载整个配置 —— 不是警告，是硬失败。
+    # 反过来在新版上旧写法只是 deprecation warning，所以旧写法兼容面更广。
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
     server_name __DOMAIN__;
 
     ssl_certificate     /etc/letsencrypt/live/__DOMAIN__/fullchain.pem;
