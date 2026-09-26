@@ -60,7 +60,7 @@ services:
         APP_URL: ${APP_URL:-http://localhost:3010}
     # 版本号跟随交付版本走：同一 tag 挂不同内容是服务器上的经典踩坑，
     # 而且保留 0.1.0 镜像就是现成的回滚目标（docker compose up -d 改回 tag 即可）。
-    image: suppliercheck-app:0.2.0
+    image: suppliercheck-app:0.3.0
     container_name: suppliercheck-app
     restart: unless-stopped
     depends_on:
