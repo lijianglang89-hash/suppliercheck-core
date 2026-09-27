@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { LogoLockup } from "@/components/brand/logo";
 import { siteConfig } from "@/lib/site";
 
 export function SiteFooter() {
@@ -9,14 +10,13 @@ export function SiteFooter() {
     <footer className="border-t border-ink-200 bg-white">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-10 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          {/* 页脚同时给出品牌名与全称：品牌在上面，全称作为正式产品名紧随其后。 */}
-          <p className="text-sm font-semibold text-ink-800">
-            {siteConfig.shortName}
-            <span className="ml-2 text-xs font-medium uppercase tracking-widest text-ink-400">
-              {siteConfig.latinName}
-            </span>
-          </p>
-          <p className="mt-1 text-xs text-ink-500">{siteConfig.name}</p>
+          {/*
+            页脚同时给出品牌标与法定全称：标在上面，全称作正式产品名紧随其后。
+            白底 → 用默认（非 inverse）变体；深底区块必须传 inverse，
+            否则会出现「白圆白勾」（docs/BRAND.md §2）。
+          */}
+          <LogoLockup />
+          <p className="mt-2 text-xs text-ink-500">{siteConfig.name}</p>
           <p className="mt-2 max-w-md text-sm leading-6 text-ink-500">{siteConfig.tagline}</p>
         </div>
 

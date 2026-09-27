@@ -48,8 +48,10 @@ export default async function DashboardPage() {
   const readyDocuments = documents.filter((row) => row.status === "READY").length;
   const readyRuns = await countReadyRuns(workspace.id);
 
-  // 四张卡的图标与底色语义：可审核/报告是「资产」用品牌蓝与绿，
-  // 供应商是待办提醒（审核要用它核对主体），所以给琥珀 —— 颜色只在表达状态差异时使用。
+  // 四张卡的底色只在表达**状态差异**时才用语义色（docs/BRAND.md §3）：
+  //   - 已解析可审 = 解析成功 → 绿
+  //   - 其余是纯计数，不是状态 → 一律品牌蓝
+  // 曾经把「供应商」涂成琥珀当作"待办提醒"，那是在用状态色做装饰。
   const stats: Array<{
     label: string;
     value: number;
@@ -80,7 +82,7 @@ export default async function DashboardPage() {
       hint: "家",
       href: "/suppliers",
       icon: "building",
-      tone: "bg-amber-50 text-warning-600",
+      tone: "bg-brand-50 text-brand-700",
     },
     {
       label: "审核报告",

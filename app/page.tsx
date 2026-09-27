@@ -158,14 +158,14 @@ export default function HomePage() {
                   审核结论由 15 条确定性规则产出，不是模型判断 ——
                   写成 AI 就是把规则包装成它自己不是的东西（docs/DESIGN.md §0 硬规则 1）。
 
-                  字重用 bold 而不是 black：Windows 雅黑只有 400/700 两档，
-                  font-black 会触发浏览器合成描边加粗，中文笔画会糊成一团。
-                  体量靠字号（lg:text-6xl）+ 收紧行高 + 品牌色高亮撑起来。
+                  字重只用 bold：实测（Windows Chrome + 雅黑，canvas 像素计量）
+                  400/500 与 600/700/800/900 只有两档渲染结果 —— 900 既不会更粗，
+                  也不会「合成描边糊成一团」（早前文档这么写过，是错的），只是被映射成 Bold。
+                  体量全部靠字号 + 收紧行高 + 品牌色高亮（见 docs/BRAND.md §4.1）。
                 */}
                 {/*
                   字号用 clamp 随视口缩放 + nowrap 保持整行不断：
                   40% 栏宽装不下固定大字号，硬拆行（「审核」被劈开）比小一号难看得多。
-                  中文没有真 900 字重（雅黑/PingFang 都没有），体量靠字号与行高，字重只用 bold。
                 */}
                 <h1 className="mt-5 text-[clamp(2.25rem,4.2vw,3.2rem)] font-bold leading-[1.15] tracking-tight text-ink-900 sm:whitespace-nowrap">
                   供应商资料审核，

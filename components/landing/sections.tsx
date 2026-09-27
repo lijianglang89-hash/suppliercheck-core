@@ -24,18 +24,23 @@ import {
 import { Icon, type IconName } from "@/components/ui/icons";
 
 /**
- * 每个检查维度的图标与语义色底框。
+ * 每个检查维度的图标与底框。
  *
  * 用 `Record<FindingCategory, ...>` 而不是在渲染处现填：新增一个维度时
  * **编译期**就会在缺项处报错，而不是等页面上出现一个空白方块。
- * 颜色只用于区分维度，不表达"好坏"（好坏由状态 pill 表达，见 docs/DESIGN.md §2）。
+ *
+ * ⚠️ 底框一律用品牌蓝/中性灰，**绝不占用语义色**（docs/BRAND.md §3）。
+ * 曾经给「证照有效期」配绿底、「主体与身份」配琥珀底，看着更热闹，
+ * 代价是页面上一半的绿和琥珀都跟审核状态无关 —— 用户看到绿色时的
+ * 第一反应本来应该是"通过"，用多了这个反应就没了。
+ * 维度的区分交给图标形状，好坏交给状态 pill。
  */
 const CATEGORY_ICONS: Record<FindingCategory, { icon: IconName; tone: string }> = {
   COMPLETENESS: { icon: "clipboard", tone: "bg-brand-50 text-brand-700" },
-  READABILITY: { icon: "file", tone: "bg-sky-50 text-sky-700" },
-  ENTITY: { icon: "building", tone: "bg-amber-50 text-warning-600" },
-  VALIDITY: { icon: "clock", tone: "bg-emerald-50 text-success-600" },
-  CONSISTENCY: { icon: "check-circle", tone: "bg-violet-50 text-violet-700" },
+  READABILITY: { icon: "file", tone: "bg-ink-100 text-ink-600" },
+  ENTITY: { icon: "building", tone: "bg-brand-50 text-brand-700" },
+  VALIDITY: { icon: "clock", tone: "bg-ink-100 text-ink-600" },
+  CONSISTENCY: { icon: "check-circle", tone: "bg-brand-50 text-brand-700" },
   AI: { icon: "settings", tone: "bg-ink-100 text-ink-600" },
 };
 
