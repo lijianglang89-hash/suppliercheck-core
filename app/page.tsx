@@ -162,7 +162,12 @@ export default function HomePage() {
                   font-black 会触发浏览器合成描边加粗，中文笔画会糊成一团。
                   体量靠字号（lg:text-6xl）+ 收紧行高 + 品牌色高亮撑起来。
                 */}
-                <h1 className="mt-5 text-4xl font-bold leading-[1.15] tracking-tight text-ink-900 sm:text-5xl lg:text-[3.4rem]">
+                {/*
+                  字号用 clamp 随视口缩放 + nowrap 保持整行不断：
+                  40% 栏宽装不下固定大字号，硬拆行（「审核」被劈开）比小一号难看得多。
+                  中文没有真 900 字重（雅黑/PingFang 都没有），体量靠字号与行高，字重只用 bold。
+                */}
+                <h1 className="mt-5 text-[clamp(2.25rem,4.2vw,3.2rem)] font-bold leading-[1.15] tracking-tight text-ink-900 sm:whitespace-nowrap">
                   供应商资料审核，
                   <br className="hidden sm:block" />
                   <span className="text-brand-700">不用再逐份翻文件</span>
