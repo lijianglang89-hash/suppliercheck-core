@@ -201,6 +201,104 @@ export function StorageDiagram() {
 }
 
 /**
+ * 首屏主界面局部：一段**密实的发现清单**。
+ *
+ * 为什么不像以前那样放"完整界面"：整页截图缩到 600px 宽后字小到看不清，
+ * 只剩一个灰方块 —— 那是"文档感"的元凶。这里只取信息密度最高的一段：
+ * 规则名 + 严重级别 + 所在文件 + 原文摘录，四列齐全，放大后每一列都读得清。
+ *
+ * 规则名来自真实规则集（调用方从 REVIEW_RULES 传入），摘录是示例 ——
+ * 整块仍需标注「示例数据」。
+ */
+export function ReportFragment({
+  rows,
+}: {
+  rows: readonly { rule: string; status: Status; file: string; excerpt: string }[];
+}) {
+  return (
+    <div className="card overflow-hidden p-0">
+      <div className="flex items-center justify-between gap-3 border-b border-ink-100 px-4 py-2.5">
+        <span className="text-xs font-medium text-ink-800">审核报告 · 发现清单</span>
+        <span className="text-[11px] text-ink-400">按严重级别排序</span>
+      </div>
+
+      <ul className="divide-y divide-ink-100">
+        {rows.map((row) => (
+          <li key={row.rule} className="flex items-start gap-3 px-4 py-2.5">
+            <span
+              className={`mt-0.5 h-2 w-2 shrink-0 rounded-full ${
+                row.status === "fail"
+                  ? "bg-danger-600"
+                  : row.status === "warn"
+                    ? "bg-warning-600"
+                    : "bg-success-600"
+              }`}
+              aria-hidden="true"
+            />
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-x-2">
+                <span className="text-xs font-medium text-ink-800">{row.rule}</span>
+                <span className="text-[11px] text-ink-400">{row.file}</span>
+              </div>
+              <p className="mt-0.5 truncate font-mono text-[11px] leading-5 text-ink-500">
+                {row.excerpt}
+              </p>
+            </div>
+            <StatusPill status={row.status} />
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/**
+ * 破形浮层：从主界面上"弹"出来的小卡片。
+ *
+ * 4px 白边 + 2xl 阴影是刻意的 —— 白边让它和底下的界面彻底分离，
+ * 重阴影提供 Z 轴高度。小屏下不做绝对定位（会溢出破版），改为堆叠在主卡下方。
+ */
+export function FloatCard({
+  tone,
+  icon,
+  title,
+  detail,
+  className = "",
+}: {
+  tone: "danger" | "success";
+  icon: IconName;
+  title: string;
+  detail: string;
+  className?: string;
+}) {
+  const toneClass =
+    tone === "danger"
+      ? "border-red-100 text-danger-600"
+      : "border-emerald-100 text-success-600";
+
+  return (
+    <div
+      className={`card w-56 border-4 border-white shadow-2xl ${toneClass} ${className}`}
+    >
+      <div className="flex items-start gap-2 p-3">
+        <span
+          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${
+            tone === "danger" ? "bg-red-50 text-danger-600" : "bg-emerald-50 text-success-600"
+          }`}
+          aria-hidden="true"
+        >
+          <Icon name={icon} className="h-3.5 w-3.5" />
+        </span>
+        <div className="min-w-0">
+          <p className="text-xs font-semibold text-ink-900">{title}</p>
+          <p className="mt-0.5 text-[11px] leading-4 text-ink-500">{detail}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
  * 审核结果面板 —— 首页的核心视觉资产。
  *
  * 数字（14 / 3 / 1）与条目都是**示例**，用来说明"报告长什么样"，

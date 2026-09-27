@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { LogoLockup } from "@/components/brand/logo";
 import { siteConfig } from "@/lib/site";
 
 /**
@@ -15,13 +16,13 @@ export function SiteHeader() {
           全称 10 个字，放在 Logo 位会挤掉整条导航；简称更容易形成品牌记忆。
           全称并没有消失 —— aria-label、title、footer、SEO 里都还在。
         */}
-        <Link href="/" className="flex items-baseline gap-2" aria-label={`${siteConfig.name} 首页`}>
-          <span className="text-lg font-semibold tracking-tight text-ink-900">
-            {siteConfig.shortName}
-          </span>
-          <span className="hidden text-xs font-medium uppercase tracking-widest text-ink-400 sm:inline">
-            {siteConfig.latinName}
-          </span>
+        <Link
+          href="/"
+          className="flex items-center"
+          aria-label={`${siteConfig.name} 首页`}
+          title={siteConfig.name}
+        >
+          <LogoLockup />
         </Link>
 
         <nav aria-label="主导航" className="flex items-center gap-1 sm:gap-2">

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { FileStack, FlowArrow, ResultPanel } from "@/components/landing/visuals";
+import { FloatCard, ReportFragment } from "@/components/landing/visuals";
 import { ReportSection } from "@/components/landing/report-section";
 import {
   BeforeAfterSection,
@@ -10,11 +10,13 @@ import {
   MetricsSection,
   RulesSection,
   SecuritySection,
-  TrustStrip,
   WorkflowSection,
 } from "@/components/landing/sections";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
+import { ALLOWED_MIME_TYPES } from "@/lib/files";
+import { ruleLabel } from "@/lib/reviews/labels";
+import { REVIEW_RULES } from "@/lib/reviews/rules";
 import { getSiteUrl, siteConfig } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -56,18 +58,40 @@ const FAQS: ReadonlyArray<{ question: string; answer: string }> = [
   },
 ];
 
-const HERO_FILES = [
-  { name: "营业执照", ext: "pdf" },
-  { name: "ISO9001 证书", ext: "pdf" },
-  { name: "检测报告", ext: "pdf" },
-  { name: "报价单", ext: "xlsx" },
-] as const;
-
-const HERO_ROWS = [
-  { label: "ISO9001 证书", status: "warn", note: "42 天后到期" },
-  { label: "开户资料", status: "warn", note: "主体名称不一致" },
-  { label: "检测报告", status: "fail", note: "资料包中未找到" },
-] as const;
+/**
+ * 首屏主界面局部的四行发现。
+ *
+ * 规则名**从真实规则集现算**（`ruleLabel` 查 REVIEW_RULES），改规则名这里跟着变；
+ * 文件名与摘录是示例，整块在界面上标注「示例数据」。
+ * 刻意不放"完整界面截图"：缩到 600px 后字小到看不清，只剩一个灰方块 ——
+ * 取信息密度最高的局部放大，才读得出这个产品到底在干什么。
+ */
+const HERO_FRAGMENT = [
+  {
+    rule: ruleLabel("CERTIFICATE_EXPIRED"),
+    status: "fail" as const,
+    file: "ISO9001 证书.pdf",
+    excerpt: "有效期至 2023-04-30 · 已过期",
+  },
+  {
+    rule: ruleLabel("USCC_INVALID"),
+    status: "fail" as const,
+    file: "营业执照.pdf",
+    excerpt: "91330100MA2×××××X7 · 校验位不符",
+  },
+  {
+    rule: ruleLabel("COMPANY_NAME_CONFLICT"),
+    status: "warn" as const,
+    file: "开户资料.pdf",
+    excerpt: "开户主体名称与营业执照不一致",
+  },
+  {
+    rule: ruleLabel("CERTIFICATE_EXPIRING_SOON"),
+    status: "warn" as const,
+    file: "检测报告.pdf",
+    excerpt: "42 天后到期 · 模板阈值 60 天",
+  },
+];
 
 export default function HomePage() {
   const siteUrl = getSiteUrl();
@@ -112,14 +136,20 @@ export default function HomePage() {
 
       <main id="main" className="flex-1">
         {/*
-          Hero：左文右产品视觉。
-          右侧刻意放"文件 → 核对 → 结果"这条链，而不是概念插画或图库照片 ——
-          这个产品最有力的证据就是它自己的界面（见 docs/DESIGN.md §4）。
+          Hero：40 / 60 非对称分栏。
+
+          左侧只做一件事 —— 用体量压住全场（大字号 + 品牌色高亮 + 主次双 CTA）。
+          右侧不再是一张"完整界面截图"，而是三层：
+            ① 点阵地基（技术感，不靠弥散光）
+            ② 主界面局部：发现清单（信息密度最高的一段，放大到能读清每一列）
+            ③ 两个破形浮层：绝对定位 + 4px 白边 + 2xl 阴影，从主界面上弹出来
+          小屏下浮层退回普通堆叠，绝不让它们在窄屏溢出破版。
         */}
         <section className="border-b border-ink-200 bg-white">
-          <div className="mx-auto w-full max-w-6xl px-6 py-16 lg:py-24">
-            <div className="grid items-center gap-12 lg:grid-cols-2">
-              <div>
+          <div className="mx-auto w-full max-w-6xl px-6 py-24 lg:py-32">
+            <div className="grid items-center gap-14 lg:grid-cols-5 lg:gap-10">
+              {/* 左：40% */}
+              <div className="lg:col-span-2">
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-600">
                   {siteConfig.latinName}
                 </p>
@@ -127,12 +157,15 @@ export default function HomePage() {
                   标题刻意不写「交给 AI」。
                   审核结论由 15 条确定性规则产出，不是模型判断 ——
                   写成 AI 就是把规则包装成它自己不是的东西（docs/DESIGN.md §0 硬规则 1）。
-                  「不用再逐份翻文件」说的是真实痛点，也是系统真能办到的事。
+
+                  字重用 bold 而不是 black：Windows 雅黑只有 400/700 两档，
+                  font-black 会触发浏览器合成描边加粗，中文笔画会糊成一团。
+                  体量靠字号（lg:text-6xl）+ 收紧行高 + 品牌色高亮撑起来。
                 */}
-                <h1 className="mt-4 text-4xl font-semibold leading-tight tracking-tight text-ink-900 lg:text-5xl">
+                <h1 className="mt-5 text-4xl font-bold leading-[1.15] tracking-tight text-ink-900 sm:text-5xl lg:text-[3.75rem]">
                   供应商资料审核，
                   <br className="hidden sm:block" />
-                  不用再逐份翻文件
+                  <span className="text-brand-700">不用再逐份翻文件</span>
                 </h1>
                 <p className="mt-6 text-base leading-7 text-ink-600">
                   上传营业执照、认证证书、检测报告、报价单等资料，自动发现缺失、过期和信息不一致问题，
@@ -142,50 +175,76 @@ export default function HomePage() {
                 <div className="mt-9 flex flex-wrap items-center gap-3">
                   <Link
                     href="/register"
-                    className="rounded-md bg-brand-700 px-6 py-3 text-sm font-medium text-white hover:bg-brand-800"
+                    className="rounded-md bg-brand-700 px-7 py-3.5 text-base font-medium text-white shadow-sm transition-colors hover:bg-brand-800"
                   >
                     免费开始审核
                   </Link>
-                  <Link
-                    href="/login"
-                    className="rounded-md border border-ink-300 bg-white px-6 py-3 text-sm font-medium text-ink-700 hover:bg-ink-50"
+                  <a
+                    href="#workflow"
+                    className="group flex items-center gap-1.5 rounded-md border border-ink-300 px-5 py-3.5 text-sm font-medium text-ink-700 transition-colors hover:border-brand-300 hover:text-brand-700"
                   >
-                    已有账号，登录
-                  </Link>
+                    查看审核流程
+                    <span aria-hidden="true" className="transition-transform group-hover:translate-x-0.5">
+                      →
+                    </span>
+                  </a>
                 </div>
 
-                <p className="mt-5 text-xs text-ink-500">
-                  V0.3 · 15 条审核规则已上线，可跑完整审核并输出报告；模型复核尚未启用
+                {/* 信任带上移：不单独占一条区块，直接压在 CTA 下面当转化背书 */}
+                <div className="mt-6">
+                  <p className="text-xs leading-6 text-ink-400">
+                    已无缝支持：
+                    {Object.values(ALLOWED_MIME_TYPES)
+                      .map((extension) => extension.replace(".", "").toUpperCase())
+                      .join(" · ")}
+                  </p>
+                  <p className="mt-1 text-xs leading-6 text-ink-400 opacity-70">
+                    私有存储 · 无公开链接 · 工作区隔离 · 不用于任何对外展示
+                  </p>
+                </div>
+
+                <p className="mt-6 text-xs text-ink-500">
+                  V0.3 · {REVIEW_RULES.length} 条审核规则已上线，可跑完整审核并输出报告；模型复核尚未启用
                 </p>
               </div>
 
-              {/*
-                右侧视觉：白卡片 + 底层点阵纹理。
-                点阵只在卡片四周露出一圈，不进内容区 —— 目的只有一个：
-                给首屏一点"工程感"的纵深，而不是靠弥散光或渐变撑气氛。
-              */}
-              <div className="relative">
-                <div aria-hidden="true" className="dot-grid absolute -inset-4 rounded-xl" />
-                <div className="card relative p-5">
-                  <div className="flex items-baseline justify-between gap-3">
-                    <p className="text-sm font-semibold text-ink-900">资料包</p>
-                    <span className="rounded bg-ink-100 px-1.5 py-0.5 text-[11px] text-ink-500">
+              {/* 右：60% —— 三层悬浮 */}
+              <div className="relative lg:col-span-3">
+                <div aria-hidden="true" className="dot-grid absolute -inset-8 rounded-2xl" />
+
+                <div className="relative">
+                  <div className="flex items-baseline justify-between gap-3 pb-2">
+                    <p className="text-sm font-semibold text-ink-900">审核报告</p>
+                    <span className="rounded bg-ink-100 px-2 py-0.5 text-[11px] text-ink-500">
                       示例数据
                     </span>
                   </div>
-                  <div className="mt-3">
-                    <FileStack files={HERO_FILES} />
-                  </div>
-                  <FlowArrow />
-                  <p className="mb-2 text-center text-[11px] text-ink-400">15 条规则逐条核对</p>
-                  <ResultPanel summary={{ pass: 14, warn: 3, fail: 1 }} rows={HERO_ROWS} />
+
+                  <ReportFragment rows={HERO_FRAGMENT} />
+
+                  {/* 破形浮层 1：向左下溢出交界线 */}
+                  <FloatCard
+                    tone="danger"
+                    icon="alert-triangle"
+                    title="证照已过期"
+                    detail="ISO9001 证书 · 阻断项"
+                    className="mt-3 lg:absolute lg:-bottom-10 lg:-left-10 lg:mt-0"
+                  />
+
+                  {/* 破形浮层 2：向右上溢出 */}
+                  <FloatCard
+                    tone="success"
+                    icon="check-circle"
+                    title="统一社会信用代码校验通过"
+                    detail="GB 32100 · 校验位一致"
+                    className="mt-3 lg:absolute lg:-right-8 lg:-top-12 lg:mt-0"
+                  />
                 </div>
               </div>
             </div>
           </div>
         </section>
 
-        <TrustStrip />
         <MetricsSection />
         <BeforeAfterSection />
         <ReportSection />

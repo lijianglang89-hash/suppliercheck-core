@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="供应商智审">
+  <!--
+    站点图标（favicon）。
+    图形语义：一份文件 + 右下角一枚"判定"徽章 ——
+    这个产品做的是"逐条核对后给出可追溯的判定"，不是泛泛的安全盾。
+    深蓝底保证 16px 下仍可辨；徽章用白底蓝勾，与底色形成二次对比。
+  -->
+  <rect width="32" height="32" rx="7" fill="#2f6097" />
+  <g fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M7.5 5h8l4 4v18h-12z" />
+    <path d="M15.5 5v4h4" />
+    <path d="M11 14h6" />
+    <path d="M11 18h6" />
+  </g>
+  <circle cx="23" cy="23" r="7" fill="#ffffff" />
+  <path
+    d="M20.2 23.1l2.1 2.1 3.6-3.6"
+    fill="none"
+    stroke="#2f6097"
+    stroke-width="2.2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+</svg>

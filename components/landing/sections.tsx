@@ -14,7 +14,6 @@ import Link from "next/link";
 
 import { CATEGORY_LABELS, CATEGORY_ORDER } from "@/lib/reviews/labels";
 import { REVIEW_RULES } from "@/lib/reviews/rules";
-import { ALLOWED_MIME_TYPES } from "@/lib/files";
 import type { FindingCategory } from "@/lib/reviews/types";
 import {
   CheckFanout,
@@ -69,58 +68,6 @@ function buildMetrics() {
       icon: "file-check" as IconName,
     },
   ] as const;
-}
-
-/**
- * 支持格式 / 已实现机制横带。
- *
- * 这里**绝不放客户 Logo**：没有标杆客户就是没有，编一排假 Logo 是假证据
- * （docs/DESIGN.md §0 硬规则 2）。改成放产品自己确有能力的东西 ——
- * 格式白名单从 `ALLOWED_MIME_TYPES` 现算，改白名单当天这里跟着变；
- * 三条机制都是 SecuritySection 里展开说明的、系统内已实现的行为。
- *
- * 视觉上它是一条灰度过渡带：把首屏的白色和内容区的色带分开。
- */
-export function TrustStrip() {
-  const formats = Object.values(ALLOWED_MIME_TYPES).map((extension) =>
-    extension.replace(".", "").toUpperCase(),
-  );
-
-  const assurances = [
-    { icon: "check-circle" as IconName, text: "GB 32100 统一社会信用代码校验位" },
-    { icon: "archive" as IconName, text: "私有存储 · 无公开链接" },
-    { icon: "user" as IconName, text: "按工作区隔离" },
-  ];
-
-  return (
-    <section aria-label="支持的文件格式与已实现机制" className="border-b border-ink-200 bg-white">
-      <div className="mx-auto w-full max-w-6xl px-6 py-7">
-        <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-5">
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            {formats.map((format) => (
-              <span
-                key={format}
-                className="rounded border border-ink-200 bg-ink-50 px-2.5 py-1 text-xs font-medium tabular-nums tracking-wide text-ink-500"
-              >
-                {format}
-              </span>
-            ))}
-          </div>
-
-          <span aria-hidden="true" className="hidden h-6 w-px bg-ink-200 sm:block" />
-
-          <ul className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
-            {assurances.map((item) => (
-              <li key={item.text} className="flex items-center gap-1.5 text-xs text-ink-500">
-                <Icon name={item.icon} className="h-3.5 w-3.5 text-ink-400" />
-                {item.text}
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
-    </section>
-  );
 }
 
 export function MetricsSection() {

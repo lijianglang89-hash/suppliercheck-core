@@ -1,4 +1,5 @@
 import { logoutAction } from "@/app/actions/auth";
+import { LogoMark } from "@/components/brand/logo";
 import { NavLinks } from "@/components/dashboard/nav-links";
 import { Topbar } from "@/components/dashboard/topbar";
 import { siteConfig } from "@/lib/site";
@@ -21,12 +22,15 @@ export function DashboardShell({ user, workspace, children }: DashboardShellProp
     <div className="flex min-h-screen flex-col lg:flex-row">
       <aside className="border-b border-ink-200 bg-white lg:w-64 lg:shrink-0 lg:border-b-0 lg:border-r">
         <div className="flex min-h-16 items-center border-b border-ink-100 px-5 py-3">
-          <a href="/dashboard" className="block">
-            <span className="block text-[15px] font-semibold leading-snug tracking-tight text-ink-900">
-              {siteConfig.name}
-            </span>
-            <span className="mt-0.5 block text-[11px] text-ink-400">
-              {siteConfig.latinName} · 供应商资料审核
+          <a href="/dashboard" className="flex items-center gap-2.5">
+            <LogoMark className="h-7 w-7 shrink-0 text-brand-700" />
+            <span className="block">
+              <span className="block text-[15px] font-semibold leading-snug tracking-tight text-ink-900">
+                {siteConfig.name}
+              </span>
+              <span className="mt-0.5 block text-[11px] text-ink-400">
+                {siteConfig.latinName} · 供应商资料审核
+              </span>
             </span>
           </a>
         </div>
