@@ -71,7 +71,13 @@ ${SCP} "${TARBALL}" "${REMOTE_HOST}:/tmp/"
 
 echo "==> ECS 加载镜像并重启（只做 load 和 up，不构建）"
 ${SCP} docker-compose.yml "${REMOTE_HOST}:/tmp/docker-compose.yml"
-${SSH} "${REMOTE_HOST}" bash -s <<REMOTE
+# ⚠️ 远端脚本必须先落成本地文件再重定向给 ssh，不要直接 `ssh ... bash -s <<EOF`。
+# 实测：在 Git Bash 里 heredoc 直接喂给 ssh 时，若 ssh 的 stdin 处理出现时序问题，
+# 剩余的 heredoc 内容会被**本机 shell** 继续读走并执行 —— 而本机 Git Bash 的 `sudo`
+# 已被 Windows 自带的 sudo.exe 抢占，于是远端命令在本机乱跑（本轮两次部署都触发了）。
+# 先写文件再 `bash -s < file`，stdin 与 ssh 完全解耦，杜绝这种串扰。
+REMOTE_SCRIPT="$(mktemp)"
+cat > "${REMOTE_SCRIPT}" <<REMOTE
 set -euo pipefail
 cd ${REMOTE_DIR}
 # ⚠️ compose 文件必须先同步：远端的 docker-compose.yml 如果还是旧版
@@ -90,6 +96,8 @@ sudo docker inspect ${IMAGE_NAME} --format 'IMAGE={{.Config.Image}} STARTED={{.S
   || sudo docker compose ps --format '{{.Name}} {{.Status}}'
 curl -s -o /dev/null -w 'LOCAL_HTTP=%{http_code}\n' --max-time 10 http://127.0.0.1:3010/
 REMOTE
+${SSH} "${REMOTE_HOST}" bash -s < "${REMOTE_SCRIPT}"
+rm -f "${REMOTE_SCRIPT}"
 
 echo "==> 验证对外的真实响应（不要只信容器 healthy）"
 curl -s -o /dev/null -w "PUBLIC_HTTP=%{http_code}\n" --max-time 20 "${APP_URL}/"
