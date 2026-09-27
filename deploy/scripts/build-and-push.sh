@@ -35,10 +35,15 @@ IMAGE_NAME="${IMAGE_NAME:-suppliercheck-app}"
 #    构建完再配环境变量是无效的。
 APP_URL="${APP_URL:-https://supplier.ultron.xin}"
 
-# Alpine 的 APK 源。国内机器请覆盖为镜像站，否则安装依赖会超时。
-APK_MIRROR="${APK_MIRROR:-https://mirrors.aliyun.com/alpine}"
+# Alpine 的 APK 源。**必须是站点根，不能带 /alpine 后缀** ——
+# Dockerfile 做的是整段前缀替换，repositories 里已经含 /alpine/... 路径。
+APK_MIRROR="${APK_MIRROR:-https://mirrors.aliyun.com}"
 
 FULL_IMAGE="${REGISTRY}/${IMAGE_NAME}:${TAG}"
+
+# ⚠️ 基础镜像默认走 DaoCloud 镜像站。本机直连 Docker Hub 实测不可达：
+#   Post "https://auth.docker.io/token": Bad Gateway（重试无效，不是抖动）
+NODE_IMAGE="${NODE_IMAGE:-docker.m.daocloud.io/library/node:22-alpine}"
 
 echo "==> 目标镜像：${FULL_IMAGE}"
 echo "==> APP_URL  ：${APP_URL}"
@@ -48,6 +53,7 @@ docker info >/dev/null 2>&1 || { echo "❌ 本机 Docker 未运行，先启动 D
 echo "==> 构建（本机内存远大于 ECS，安全）"
 docker build \
   --file Dockerfile \
+  --build-arg "NODE_IMAGE=${NODE_IMAGE}" \
   --build-arg "APP_URL=${APP_URL}" \
   --build-arg "APK_MIRROR=${APK_MIRROR}" \
   --tag "${FULL_IMAGE}" \
