@@ -23,7 +23,7 @@ import { describe, expect, it } from "vitest";
 import type { AIProvider } from "@/lib/ai";
 import { pdfParser } from "@/lib/documents/parsers/pdf";
 import { runReviewEngine } from "@/lib/reviews/engine";
-import { REVIEW_RULES } from "@/lib/reviews/rules";
+import { REVIEW_RULES, type SubjectType } from "@/lib/reviews/rules";
 import { findCompanyNames, findExpiryWindows, findLongTermMarkers } from "@/lib/reviews/extract";
 import {
   RULE_IDS,
@@ -78,6 +78,7 @@ async function run(
   extras: {
     supplierName?: string | null;
     supplierUscc?: string | null;
+    supplierSubjectType?: SubjectType | null;
     maxFindings?: number;
     provider?: AIProvider;
   } = {},
@@ -88,6 +89,7 @@ async function run(
     now: NOW,
     supplierName: extras.supplierName ?? null,
     supplierUscc: extras.supplierUscc ?? null,
+    supplierSubjectType: extras.supplierSubjectType ?? null,
     ...(extras.maxFindings !== undefined ? { maxFindings: extras.maxFindings } : {}),
     ...(extras.provider ? { provider: extras.provider } : {}),
   });
@@ -203,9 +205,15 @@ describe("正文可用性", () => {
 });
 
 describe("统一社会信用代码", () => {
-  it("完全没有代码时报「未找到」", async () => {
+  // 这条在引入 subjectType 之后**行为变了**，注释写清楚为什么：
+  // 以前未指定主体类型 → 一律按企业报 MEDIUM；现在未知就是未知，降级为 LOW。
+  it("完全没有代码、且主体类型未指定时，按「提示」而不是「问题」报出", async () => {
     const outcome = await run([doc("这是一份没有任何代码的资料，营业执照在此。")]);
-    expect(findingsOf(outcome, "USCC_MISSING")).toHaveLength(1);
+    const findings = findingsOf(outcome, "USCC_MISSING");
+    expect(findings).toHaveLength(1);
+    expect(findings[0]!.severity).toBe("LOW");
+    // 文案必须交代"为什么是提示"，否则用户不知道该怎么处理
+    expect(findings[0]!.detail).toContain("没有指定主体类型");
   });
 
   it("校验位错误时报 HIGH 并写出应有校验位", async () => {
@@ -220,6 +228,68 @@ describe("统一社会信用代码", () => {
     const outcome = await run([doc("统一社会信用代码：914403001922038216")]);
     expect(findingsOf(outcome, "USCC_INVALID")).toHaveLength(0);
     expect(findingsOf(outcome, "USCC_MISSING")).toHaveLength(0);
+  });
+
+  /*
+   * 下面一组是 subjectType 的核心断言。
+   *
+   * 判据来自一条事实：不是所有供应商都有 18 位统一社会信用代码。
+   * 自然人（只有身份证号）与境外主体都没有。把他们按"缺代码"报出来是稳定假阳性，
+   * 而假阳性会训练用户忽略告警 —— 这比漏判更贵（错误代价不对称原则）。
+   */
+  describe("主体类型决定 USCC 缺失算不算问题", () => {
+    const NO_CODE = "这是一份没有任何代码的资料，营业执照在此。";
+
+    it("自然人与境外主体没有 USCC 是正常的，不应报出", async () => {
+      for (const subjectType of ["INDIVIDUAL", "OVERSEAS"] as const) {
+        const outcome = await run([doc(NO_CODE)], onboarding, { supplierSubjectType: subjectType });
+        expect(
+          findingsOf(outcome, "USCC_MISSING"),
+          `主体类型 ${subjectType} 不应报 USCC 缺失`,
+        ).toHaveLength(0);
+      }
+    });
+
+    it("企业与事业单位应当持有 USCC，缺失报 MEDIUM", async () => {
+      for (const subjectType of ["ENTERPRISE", "INSTITUTION"] as const) {
+        const outcome = await run([doc(NO_CODE)], onboarding, { supplierSubjectType: subjectType });
+        const findings = findingsOf(outcome, "USCC_MISSING");
+        expect(findings, `主体类型 ${subjectType} 应报 USCC 缺失`).toHaveLength(1);
+        expect(findings[0]!.severity).toBe("MEDIUM");
+      }
+    });
+
+    it("主体类型未指定时降级为 LOW，既不冤枉也不漏掉", async () => {
+      const outcome = await run([doc(NO_CODE)], onboarding, { supplierSubjectType: null });
+      const findings = findingsOf(outcome, "USCC_MISSING");
+      expect(findings).toHaveLength(1);
+      expect(findings[0]!.severity).toBe("LOW");
+    });
+
+    /**
+     * ⚠️ 与"缺失"相反：校验位错误**不随主体类型降级**。
+     * 代码缺失可能是正常的（自然人本来没有），
+     * 但代码出现且校验位算不对，一定是错误。
+     * 把两者按同一套口径处理，正是早期误报的主要来源。
+     */
+    it("校验位错误对任何主体类型都是问题，不因自然人/境外而豁免", async () => {
+      for (const subjectType of ["INDIVIDUAL", "OVERSEAS", null] as const) {
+        const outcome = await run([doc("统一社会信用代码：914403001922038217")], onboarding, {
+          supplierSubjectType: subjectType,
+        });
+        const findings = findingsOf(outcome, "USCC_INVALID");
+        expect(findings, `主体类型 ${subjectType} 仍应报校验位错误`).toHaveLength(1);
+        expect(findings[0]!.severity).toBe("HIGH");
+      }
+    });
+
+    it("自然人资料里出现 18 位代码时，额外提示核对主体类型是否登记有误", async () => {
+      const outcome = await run([doc("统一社会信用代码：914403001922038217")], onboarding, {
+        supplierSubjectType: "INDIVIDUAL",
+      });
+      const findings = findingsOf(outcome, "USCC_INVALID");
+      expect(findings[0]!.detail).toContain("主体类型是否登记有误");
+    });
   });
 
   it("出现两个不同代码时报「多主体」", async () => {
@@ -525,6 +595,8 @@ describe("规则实现的健壮性", () => {
           config: onboarding,
           supplierName: null,
           supplierUscc: null,
+          // 主体类型未知（null）也要能跑通 —— 这是最常见的真实状态
+          supplierSubjectType: null,
           now: NOW,
         }),
       ).not.toThrow();

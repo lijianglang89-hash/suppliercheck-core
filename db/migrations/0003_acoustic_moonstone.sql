@@ -1,0 +1,2 @@
+CREATE TYPE "public"."supplier_subject_type" AS ENUM('ENTERPRISE', 'INSTITUTION', 'INDIVIDUAL', 'OVERSEAS');--> statement-breakpoint
+ALTER TABLE "suppliers" ADD COLUMN "subject_type" "supplier_subject_type";

@@ -114,6 +114,30 @@ export const userStatusEnum = pgEnum("user_status", ["ACTIVE", "SUSPENDED"]);
 /** 供应商主体的生命周期状态。归档而不是删除，历史审核报告才不会失去主体信息。 */
 export const supplierStatusEnum = pgEnum("supplier_status", ["ACTIVE", "ARCHIVED"]);
 
+/**
+ * 供应商的**主体类型**。
+ *
+ * 存在的理由是一条事实：不是所有供应商都有 18 位统一社会信用代码。
+ *   - ENTERPRISE   企业法人（含个体工商户）—— 有 USCC
+ *   - INSTITUTION  事业单位 / 社会团体 —— **也有** USCC（GB 32100 覆盖，同样是 18 位）
+ *   - INDIVIDUAL   自然人（个体工匠、自由职业者等）—— 只有身份证号，没有 USCC
+ *   - OVERSEAS     境外主体 —— 没有中国的 USCC
+ *
+ * ⚠️ 不做推断、不设默认值。
+ * 曾经考虑过"从公司名后缀猜是不是事业单位"（看到「中心 / 研究院 / 协会」就跳过 USCC 检查），
+ * 那条路是错的：后缀猜不准，而且猜错的结果是把一份**缺证照的合格资料**或
+ * **一份真的有问题的资料**按错的口径处理 —— 冤枉和漏判都会发生。
+ *
+ * 正确做法就是让用户在登记供应商时明确选一次，没选就是**未知**，
+ * 规则按"未知"处理（降级为提示），而不是按"企业"处理。
+ */
+export const supplierSubjectTypeEnum = pgEnum("supplier_subject_type", [
+  "ENTERPRISE",
+  "INSTITUTION",
+  "INDIVIDUAL",
+  "OVERSEAS",
+]);
+
 /** 审核任务的执行状态。与文档解析状态机同构，但语义独立：这里跑的是规则引擎。 */
 export const reviewRunStatusEnum = pgEnum("review_run_status", [
   "QUEUED",
@@ -226,6 +250,13 @@ export const suppliers = pgTable(
       .notNull()
       .references(() => workspaces.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
+    /**
+     * 主体类型。**允许为 null，且 null 有明确含义：用户没填，系统不知道。**
+     *
+     * 不要给它 default("ENTERPRISE") —— 那等于替用户声明"这是一家企业"，
+     * 而规则的严厉程度正取决于这个声明。未知就是未知，规则会因此降级成提示。
+     */
+    subjectType: supplierSubjectTypeEnum("subject_type"),
     /** 统一社会信用代码（18 位）。允许为空 —— 资料还没到手时不该逼用户编一个。 */
     unifiedSocialCreditCode: text("unified_social_credit_code"),
     contactName: text("contact_name"),

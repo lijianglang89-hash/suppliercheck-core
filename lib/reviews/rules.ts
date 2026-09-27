@@ -51,8 +51,28 @@ export interface RuleContext {
   supplierName: string | null;
   /** 申报主体的统一社会信用代码；未登记时为 null。 */
   supplierUscc: string | null;
+  /** 申报主体的类型；未登记或用户没选时为 null（含义是"未知"，不是"企业"）。 */
+  supplierSubjectType: SubjectType | null;
   /** 判定「今天」的基准。显式传入而不是读系统时钟，规则才可测。 */
   now: Date;
+}
+
+/**
+ * 主体类型。与 lib/db/schema.ts 的 supplierSubjectTypeEnum 一一对应。
+ * 这里重新声明一份是为了让 rules.ts 不依赖数据库 schema ——
+ * 规则是纯函数，不应该知道数据怎么存的。
+ */
+export type SubjectType = "ENTERPRISE" | "INSTITUTION" | "INDIVIDUAL" | "OVERSEAS";
+
+/**
+ * 该主体类型**是否应当持有** 18 位统一社会信用代码。
+ *
+ * 这是整个 subjectType 功能唯一的判断点，单独拎出来是因为它必须能被一眼审完：
+ * 事业单位有 USCC（GB 32100 覆盖，同为 18 位），自然人与境外主体没有。
+ * 判错这一类，后果是把正常资料报成问题（冤枉）或把问题资料放过（漏判）。
+ */
+export function expectsUscc(subjectType: SubjectType | null): boolean {
+  return subjectType === "ENTERPRISE" || subjectType === "INSTITUTION";
 }
 
 export interface ReviewRuleDefinition {
@@ -313,25 +333,49 @@ const usccMissing: ReviewRuleDefinition = {
     if (hits.length > 0) return [];
     if (readableDocuments(context.documents).length === 0) return [];
 
+    const subjectType = context.supplierSubjectType;
+
+    /*
+     * 三种情形，严厉程度不同 —— 这是 subjectType 存在的全部意义。
+     *
+     * 1. 明确是自然人 / 境外主体：**不报**。
+     *    他们本来就没有 18 位 USCC，报出来是稳定假阳性，
+     *    而假阳性会训练用户忽略告警（错误代价不对称原则）。
+     *
+     * 2. 明确是企业 / 事业单位：MEDIUM。
+     *    USCC 是核对主体身份的唯一抓手，没有它这条链路就断了。
+     *
+     * 3. **未知（null）**：LOW，且文案必须说明"因为不知道主体类型所以无法判断"。
+     *
+     *    第 3 种是最需要拿捏的。不能按企业处理（会冤枉自然人/境外主体），
+     *    也不能干脆不报（会漏掉真的缺营业执照的企业）。
+     *    降到 LOW + 说清理由，是"不知道就说不知道" —— 与本项目的核心纪律一致。
+     */
+    if (subjectType === "INDIVIDUAL" || subjectType === "OVERSEAS") {
+      return [];
+    }
+
+    const known = expectsUscc(subjectType);
+
     return [
       {
         ruleId: "USCC_MISSING",
         category: "ENTITY",
-        severity: "MEDIUM",
-        title: "未找到统一社会信用代码",
-        /*
-         * ⚠️ 措辞刻意**不假设申报主体一定是企业**。
-         *
-         * 供应商可以是企业法人、个体工商户、事业单位，也可以是**自然人**。
-         * 自然人没有统一社会信用代码（只有身份证号），境外主体也没有 18 位 USCC。
-         * 若文案写成"缺少营业执照"，对这两类主体就是稳定的假阳性。
-         */
-        detail:
-          `${searchScopeNote(context.documents)}，未出现形如 18 位统一社会信用代码的字符串。` +
-          "若申报主体为企业法人或个体工商户，缺少它就无法自动核对主体身份；" +
-          "若申报主体为自然人或境外主体，本条不适用。",
-        recommendation:
-          "若申报主体为企业或个体工商户，请补充营业执照或统一社会信用代码；若为自然人或境外主体，可忽略本条。",
+        severity: known ? "MEDIUM" : "LOW",
+        title: known ? "未找到统一社会信用代码" : "未找到统一社会信用代码（主体类型未指定）",
+        detail: known
+          ? `${searchScopeNote(context.documents)}，未出现形如 18 位统一社会信用代码的字符串。` +
+            "申报主体登记为企业法人或事业单位，缺少它就无法自动核对主体身份。"
+          : `${searchScopeNote(context.documents)}，未出现形如 18 位统一社会信用代码的字符串。` +
+            "本条按「提示」而非「问题」报出：登记供应商时没有指定主体类型，" +
+            "因此无法判断「缺少代码」对这份资料是正常的还是异常 —— " +
+            "自然人（只有身份证号）与境外主体都没有中国 USCC。",
+        recommendation: known
+          ? "请补充营业执照或统一社会信用代码。"
+          : "在供应商资料里补上主体类型（企业 / 事业单位 / 自然人 / 境外），" +
+            "本条会自动升级为问题或自动消失；同时可确认资料是否本应包含营业执照。",
+        // locator 带上主体类型，报告里能直接看出这条结论依赖了什么前提
+        locator: { subjectType: subjectType ?? "UNKNOWN" },
       },
     ];
   },
@@ -353,9 +397,20 @@ const usccInvalid: ReviewRuleDefinition = {
         category: "ENTITY",
         severity: "HIGH",
         title: `统一社会信用代码校验不通过：${hit.value}`,
+        /*
+         * ⚠️ 与 USCC_MISSING 不同，这条**不随主体类型降级**。
+         *
+         * 代码缺失可能是正常的（自然人本来没有），
+         * 但代码出现且校验位算不对，一定是错误 —— 抄错、伪造，或者主体类型登记错了。
+         * 把"缺失"和"错误"按同一套口径处理，正是早期版本最大的误报来源。
+         */
         detail:
           `按 GB 32100-2015 计算校验位：${hit.validation.reason}。` +
-          "校验位不通过的代码不可能是合法登记码 —— 通常是转录错误，也可能是编造。",
+          "校验位不通过的代码不可能是合法登记码 —— 通常是转录错误，也可能是编造。" +
+          (context.supplierSubjectType === "INDIVIDUAL" ||
+          context.supplierSubjectType === "OVERSEAS"
+            ? "注意：申报主体登记为自然人或境外主体，资料中却出现了 18 位中国统一社会信用代码 —— 请同时核对主体类型是否登记有误。"
+            : ""),
         recommendation: "请以营业执照原件或国家企业信用信息公示系统的查询结果为准，修正后再提交。",
         documentId: document.id,
         documentLabel: documentLabelOf(document),

@@ -115,6 +115,8 @@ function SupplierCard({
 }) {
   const editValues: SupplierFormValues = {
     name: supplier.name,
+    // 未指定（null）→ 空串，下拉框会选中"未指定"这一项
+    subjectType: supplier.subjectType ?? "",
     unifiedSocialCreditCode: supplier.unifiedSocialCreditCode ?? "",
     contactName: supplier.contactName ?? "",
     contactPhone: supplier.contactPhone ?? "",

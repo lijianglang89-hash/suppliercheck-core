@@ -12,6 +12,7 @@ import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 
 import { getDb } from "@/lib/db";
 import { suppliers, type NewSupplier, type Supplier } from "@/lib/db/schema";
+import type { SubjectType } from "@/lib/reviews/rules";
 
 export async function listWorkspaceSuppliers(
   workspaceId: string,
@@ -66,6 +67,7 @@ export async function insertSupplier(input: NewSupplier): Promise<Supplier> {
 
 export interface UpdateSupplierInput {
   name: string;
+  subjectType: SubjectType | null;
   unifiedSocialCreditCode: string | null;
   contactName: string | null;
   contactPhone: string | null;

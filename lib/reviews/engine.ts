@@ -12,7 +12,12 @@ import type { AIProvider } from "@/lib/ai";
 import type { TemplateConfig } from "@/lib/templates/types";
 
 import { runAiReviewPass } from "./ai-pass";
-import { MAX_FINDINGS_PER_DOCUMENT, REVIEW_RULES, selectRules } from "./rules";
+import {
+  MAX_FINDINGS_PER_DOCUMENT,
+  REVIEW_RULES,
+  type SubjectType,
+  selectRules,
+} from "./rules";
 import {
   emptySeverityCounts,
   isBlocking,
@@ -35,6 +40,14 @@ export interface RunReviewEngineInput {
   supplierName?: string | null;
   /** 申报主体的统一社会信用代码；未登记传 null。用于多主体判定的降噪。 */
   supplierUscc?: string | null;
+  /**
+   * 申报主体的类型。未登记或用户没选时传 **null**。
+   *
+   * ⚠️ null 有明确含义：系统不知道。**不要**在调用方兜底成 "ENTERPRISE" ——
+   * 那等于替用户声明主体是企业，而 USCC 类规则的严厉程度取决于这个声明。
+   * 规则侧对 null 的处理是降级成「提示」，既不冤枉也不漏掉。
+   */
+  supplierSubjectType?: SubjectType | null;
   /** 判定基准时刻。必传 —— 见文件头说明。 */
   now: Date;
   /** 落库发现数上限。超出时裁剪并**在摘要里如实说明**，绝不静默丢弃。 */
@@ -51,6 +64,7 @@ export async function runReviewEngine(input: RunReviewEngineInput): Promise<Engi
     config: input.config,
     supplierName: input.supplierName ?? null,
     supplierUscc: input.supplierUscc ?? null,
+    supplierSubjectType: input.supplierSubjectType ?? null,
     now: input.now,
   };
 

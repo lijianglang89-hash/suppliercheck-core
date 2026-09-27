@@ -29,8 +29,27 @@ import {
   updateSupplierById,
 } from "@/lib/suppliers/service";
 
+/**
+ * 主体类型。空字符串 = 用户没选，落库为 null（含义是"未知"）。
+ *
+ * ⚠️ 不用 `.default("ENTERPRISE")`。默认值会替用户声明主体是企业，
+ * 而 USCC 规则的严厉程度取决于这个声明 —— 静默替用户做这个决定，
+ * 结果是某些自然人 / 境外主体的资料被稳定误报。
+ */
+const SUBJECT_TYPES = ["ENTERPRISE", "INSTITUTION", "INDIVIDUAL", "OVERSEAS"] as const;
+type SubjectTypeValue = (typeof SUBJECT_TYPES)[number];
+
+const subjectTypeSchema = z
+  .string()
+  .trim()
+  .transform((value): SubjectTypeValue | null =>
+    SUBJECT_TYPES.includes(value as SubjectTypeValue) ? (value as SubjectTypeValue) : null,
+  )
+  .catch(null);
+
 const supplierFieldsSchema = z.object({
   name: z.string().trim().min(1, "请填写供应商名称").max(120, "名称最多 120 个字符"),
+  subjectType: subjectTypeSchema,
   unifiedSocialCreditCode: z.string().trim().max(64).optional().default(""),
   contactName: z.string().trim().max(200).optional().default(""),
   contactPhone: z.string().trim().max(200).optional().default(""),
@@ -42,6 +61,8 @@ const supplierFieldsSchema = z.object({
 function readSupplierFields(formData: FormData) {
   return {
     name: String(formData.get("name") ?? ""),
+    // 空字符串在 schema 里会被转成 null；这里不做任何兜底猜测
+    subjectType: readSubjectType(formData.get("subjectType")),
     unifiedSocialCreditCode: String(formData.get("unifiedSocialCreditCode") ?? ""),
     contactName: String(formData.get("contactName") ?? ""),
     contactPhone: String(formData.get("contactPhone") ?? ""),
@@ -49,6 +70,20 @@ function readSupplierFields(formData: FormData) {
     region: String(formData.get("region") ?? ""),
     note: String(formData.get("note") ?? ""),
   };
+}
+
+/**
+ * 读主体类型，返回**字符串**（未知返回空串）。
+ *
+ * 保持字符串形态是为了兼容 FormState.values（回显用），
+ * 转 null 的动作交给 schema 做 —— 一处转换比两处好。
+ *
+ * 白名单校验的理由：这个值来自浏览器。非法值按"未指定"处理而不是报错，
+ * 是因为"没选"本来就是合法状态，不该因为一个下拉框异常就让整次登记失败。
+ */
+function readSubjectType(raw: FormDataEntryValue | null): string {
+  const value = String(raw ?? "").trim();
+  return SUBJECT_TYPES.includes(value as SubjectTypeValue) ? value : "";
 }
 
 /** 邮箱字段不是必填，但填了就得像个邮箱 —— 否则它只会在未来某天静默失败。 */

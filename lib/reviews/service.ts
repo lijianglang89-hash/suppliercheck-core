@@ -30,6 +30,7 @@ import { resolveTemplate } from "@/lib/templates/service";
 import { parseTemplateConfig } from "@/lib/templates/types";
 
 import { runReviewEngine } from "./engine";
+import type { SubjectType } from "./rules";
 import {
   MAX_DOCUMENTS_PER_RUN,
   MAX_RUN_NAME_CHARS,
@@ -235,6 +236,7 @@ export async function executeReviewRun(run: ReviewRun): Promise<void> {
         config,
         supplierName: supplier.name,
         supplierUscc: supplier.uscc,
+        supplierSubjectType: supplier.subjectType,
         now: new Date(),
         maxFindings: MAX_REVIEW_FINDINGS,
       }),
@@ -370,11 +372,17 @@ function buildDocumentInputs(rows: DocumentWithTextRow[]): BuildDocumentInputsRe
 async function loadSupplierContext(
   workspaceId: string,
   supplierId: string | null,
-): Promise<{ name: string | null; uscc: string | null }> {
-  if (!supplierId) return { name: null, uscc: null };
+): Promise<{ name: string | null; uscc: string | null; subjectType: SubjectType | null }> {
+  if (!supplierId) return { name: null, uscc: null, subjectType: null };
   const [supplier] = await findSuppliersByIds(workspaceId, [supplierId]);
-  if (!supplier) return { name: null, uscc: null };
-  return { name: supplier.name, uscc: supplier.unifiedSocialCreditCode ?? null };
+  if (!supplier) return { name: null, uscc: null, subjectType: null };
+  return {
+    name: supplier.name,
+    uscc: supplier.unifiedSocialCreditCode ?? null,
+    // 用户没选就是 null。刻意不兜底成 "ENTERPRISE"：规则会因此降级成提示，
+    // 这比替用户声明"这是企业"然后冤枉一份自然人资料要好。
+    subjectType: supplier.subjectType ?? null,
+  };
 }
 
 function toStringArray(value: unknown): string[] {

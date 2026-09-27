@@ -14,6 +14,7 @@ import { errors } from "@/lib/errors";
 import { isUuid } from "@/lib/files";
 
 import { validateUscc } from "@/lib/reviews/extract";
+import type { SubjectType } from "@/lib/reviews/rules";
 
 import {
   findSupplierById,
@@ -26,6 +27,12 @@ import {
 
 export interface SupplierInput {
   name: string;
+  /**
+   * 主体类型。**null / 省略 = 未指定**，不要在这里兜底成 "ENTERPRISE"。
+   * 见 lib/reviews/rules.ts 的 expectsUscc：这个字段直接决定
+   * 「代码缺失」算不算一条问题。
+   */
+  subjectType?: SubjectType | null;
   unifiedSocialCreditCode?: string | null;
   contactName?: string | null;
   contactPhone?: string | null;
@@ -36,6 +43,7 @@ export interface SupplierInput {
 
 export interface NormalizedSupplierInput {
   name: string;
+  subjectType: SubjectType | null;
   unifiedSocialCreditCode: string | null;
   contactName: string | null;
   contactPhone: string | null;
@@ -79,6 +87,8 @@ export function normalizeSupplierInput(input: SupplierInput): NormalizedSupplier
 
   return {
     name,
+    // 未指定就是 null。**不猜** —— 猜错主体类型会直接导致审核结论冤枉或漏判。
+    subjectType: input.subjectType ?? null,
     unifiedSocialCreditCode: uscc.length > 0 ? uscc : null,
     contactName: trimToNull(input.contactName, MAX_FIELD_CHARS, "联系人"),
     contactPhone: trimToNull(input.contactPhone, MAX_FIELD_CHARS, "联系电话"),

@@ -22,8 +22,25 @@ import { createSupplierAction, updateSupplierAction } from "@/app/actions/suppli
 const inputClassName =
   "mt-1.5 block w-full rounded-md border border-ink-300 bg-white px-3 py-2 text-sm text-ink-900 placeholder:text-ink-400 focus:border-brand-600 focus:outline-none";
 
+/**
+ * 主体类型下拉选项。
+ *
+ * 顺序刻意：**第一个是"未指定"**，且不叫"企业"。
+ * 默认选中"企业"的话，用户一路回车就替他声明了主体是企业，
+ * 而 USCC 类规则的严厉程度正取决于这个声明 —— 静默替用户做这个决定是危险的。
+ * 留空 + 说明后果，让他自己选。
+ */
+const SUBJECT_TYPE_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
+  { value: "", label: "未指定" },
+  { value: "ENTERPRISE", label: "企业法人 / 个体工商户" },
+  { value: "INSTITUTION", label: "事业单位 / 社会团体" },
+  { value: "INDIVIDUAL", label: "自然人（无统一社会信用代码）" },
+  { value: "OVERSEAS", label: "境外主体" },
+];
+
 export interface SupplierFormValues {
   name: string;
+  subjectType: string;
   unifiedSocialCreditCode: string;
   contactName: string;
   contactPhone: string;
@@ -34,6 +51,7 @@ export interface SupplierFormValues {
 
 export const BLANK_SUPPLIER_FORM: SupplierFormValues = {
   name: "",
+  subjectType: "",
   unifiedSocialCreditCode: "",
   contactName: "",
   contactPhone: "",
@@ -78,6 +96,32 @@ export function SupplierForm({ mode, action, initial, supplierId }: SupplierForm
             placeholder="与营业执照一致的全称"
           />
           <FieldError message={errors.name} />
+        </div>
+
+        <div>
+          <label htmlFor={`${mode}-subjectType`} className="block text-sm font-medium text-ink-700">
+            主体类型
+          </label>
+          <select
+            id={`${mode}-subjectType`}
+            name="subjectType"
+            defaultValue={values.subjectType}
+            className={inputClassName}
+          >
+            {SUBJECT_TYPE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          {/*
+            这句说明不是装饰。它解释的是"不填会怎样"——
+            用户只有知道后果，才会判断这个字段对他重不重要。
+          */}
+          <p className="mt-1 text-xs text-ink-400">
+            自然人与境外主体没有统一社会信用代码；未指定时，代码缺失只作提示、不作问题。
+          </p>
+          <FieldError message={errors.subjectType} />
         </div>
 
         <div>
