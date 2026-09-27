@@ -65,3 +65,8 @@ next-env.d.ts
 
 # 截图验收产物（DESIGN.md §10）
 docs/screenshots/
+
+# 搜索引擎站长平台的登录态（含 Cookie，等同于账号凭据）
+# 由 scripts/seo/search-console.mjs 生成，绝不能入库
+.workbuddy/seo-profile/
+*-state.json
