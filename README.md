@@ -411,6 +411,43 @@ suppliercheck-postgres 容器（Docker 内部网络，不经过宿主机端口�
 文件：/srv/suppliercheck/storage/uploads（私有卷，不对外暴露 URL）
 ```
 
+### ⚠️ 禁止在服务器上构建（血的教训，不是偏好）
+
+**永远不要在 ECS 上执行 `docker compose build app`。**
+
+2026-09-27 事故复盘：
+
+| 时间 | 现象 |
+|---|---|
+| 在生产机触发 `docker compose build app` | 正常开始 |
+| 20+ 分钟 | 未返回（此前同类构建 6 分 38 秒） |
+| 随后 | `ssh` → `Connection timed out during banner exchange` |
+| 多次重试 | HTTPS → `HTTP=000` |
+| 关键判据 | **TCP 22 / 443 仍 OPEN，但服务进程不应答** |
+
+端口在监听而进程不响应 = **整机资源耗尽**。这台 ECS 是 2 核 4G，
+上面还跑着内容矩阵的 9 个容器；Next.js 构建阶段的内存消耗没有上限。
+最后是靠云服务器控制台强制重启才恢复。
+
+**正确做法**：本机（或 CI）`docker build` → 推送阿里云 ACR（个人版免费）→
+ECS 上只做 `docker compose pull` + `up -d`。把更新时间从 20 分钟的高危局
+降到 10 秒。
+
+脚本：`deploy/scripts/build-and-push.sh`
+
+```bash
+# 本机
+ACR_REGISTRY=registry.cn-shenzhen.aliyuncs.com/<ns> \
+ACR_USERNAME=<用户名> ACR_PASSWORD=<密码> \
+bash deploy/scripts/build-and-push.sh 0.3.1
+
+# ECS（只有拉取和重启）
+ssh admin@<ECS> "cd /srv/suppliercheck && sudo docker compose pull app && sudo docker compose up -d app"
+```
+
+> ⚠️ ECS 上的 `docker-compose.yml` 里 `image` 必须改成 ACR 的完整地址，
+> 否则 `pull` 拉的是本地 tag —— 表面上 `up -d` 成功，跑的还是旧镜像。
+
 ### 存储目录准备
 
 挂载卷在容器内是 `/storage/uploads`（属主 `1001:1001`）。宿主目录**必须先建好并给对属主**，

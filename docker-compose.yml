@@ -60,7 +60,14 @@ services:
         APP_URL: ${APP_URL:-http://localhost:3010}
     # 版本号跟随交付版本走：同一 tag 挂不同内容是服务器上的经典踩坑，
     # 而且保留 0.1.0 镜像就是现成的回滚目标（docker compose up -d 改回 tag 即可）。
-    image: suppliercheck-app:0.3.0
+    #
+    # ⚠️ 走「异地构建 + 拉取上线」时必须用 ${APP_IMAGE} 覆盖：
+    #   APP_IMAGE=registry.cn-shenzhen.aliyuncs.com/<ns>/suppliercheck-app:0.3.1 \
+    #     docker compose pull app && docker compose up -d app
+    # 不覆盖的话 image 仍是本地 tag —— `pull` 拉不到东西、`up -d` 却报成功，
+    # 结果跑的还是旧镜像。这个失败是静默的，看日志看不出来，只能用
+    # `docker images --digests` 或从页面内容反查。
+    image: ${APP_IMAGE:-suppliercheck-app:0.3.0}
     container_name: suppliercheck-app
     restart: unless-stopped
     depends_on:
