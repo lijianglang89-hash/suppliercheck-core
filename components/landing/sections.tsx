@@ -15,13 +15,9 @@ import Link from "next/link";
 import { CATEGORY_LABELS, CATEGORY_ORDER } from "@/lib/reviews/labels";
 import { REVIEW_RULES } from "@/lib/reviews/rules";
 import type { FindingCategory } from "@/lib/reviews/types";
-import {
-  CheckFanout,
-  RulePipeline,
-  StatusPill,
-  StorageDiagram,
-} from "@/components/landing/visuals";
+import { CheckFanout, RulePipeline, StorageDiagram } from "@/components/landing/visuals";
 import { Icon, type IconName } from "@/components/ui/icons";
+import { Reveal } from "@/components/ui/reveal";
 
 /**
  * 每个检查维度的图标与底框。
@@ -257,6 +253,12 @@ function buildCheckGroups() {
   }));
 }
 
+/**
+ * 五类检查区 —— Z 字第二拍：左图（CheckFanout + 弥散光）/ 右文（5 个真实维度）。
+ *
+ * 与报告区（左文右 UI）交错，阅读线形成 Z 字流转，化解长页疲劳。
+ * 维度内容全部来自 CAPABILITIES（真实分类，不是编的「财务合规/法律履约」）。
+ */
 export function CapabilitiesSection() {
   const checkGroups = buildCheckGroups();
   /** 示意的“本次结论”：五个维度分别有事没事。刻意不统一成一个颜色。 */
@@ -264,57 +266,94 @@ export function CapabilitiesSection() {
 
   return (
     <section aria-labelledby="capabilities-heading" className="border-b border-ink-200 bg-white">
-      <div className="mx-auto w-full max-w-6xl px-6 py-16 lg:py-20">
-        <h2 id="capabilities-heading" className="text-2xl font-semibold tracking-tight text-ink-900">
-          五类检查，一次跑完
-        </h2>
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-ink-600">
-          一份资料包进去，五个维度各跑各的规则，最后汇总成一份报告。
-          审核结论全部由规则产出：同一份资料跑两次，结果一致。
-        </p>
+      <div className="mx-auto w-full max-w-6xl px-6 py-24 lg:py-28">
+        <div className="grid items-center gap-14 lg:grid-cols-2 lg:gap-12">
+          {/* 左 50%：CheckFanout 视觉（弥散光背板） */}
+          <Reveal className="relative order-2 lg:order-1" delayMs={120}>
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute -inset-6 rounded-3xl bg-brand-500/12 blur-3xl"
+            />
+            <div className="relative">
+              <CheckFanout
+                groups={checkGroups.map((group, index) => ({
+                  label: group.label,
+                  count: group.count,
+                  status: demoStatus[index],
+                  headline: CATEGORY_HEADLINES[group.category],
+                  ...CATEGORY_ICONS[group.category],
+                }))}
+              />
+              <p className="mt-2 text-[11px] leading-5 text-ink-500">
+                每个维度的规则条数取自当前已上线的规则集；图中状态为一次示意性审核的结果，不代表任何真实资料。
+              </p>
+            </div>
+          </Reveal>
 
-        <div className="mt-8">
-          <CheckFanout
-            groups={checkGroups.map((group, index) => ({
-              label: group.label,
-              count: group.count,
-              status: demoStatus[index],
-              headline: CATEGORY_HEADLINES[group.category],
-              ...CATEGORY_ICONS[group.category],
-            }))}
-          />
-          <p className="mt-2 text-[11px] leading-5 text-ink-500">
-            每个维度的规则条数取自当前已上线的规则集；图中状态为一次示意性审核的结果，不代表任何真实资料。
-          </p>
+          {/* 右 50%：标题 + 五个真实维度紧凑列表 */}
+          <Reveal className="order-1 lg:order-2">
+            <span className="inline-flex items-center gap-2 rounded-full border border-ink-200 bg-ink-50 px-3 py-1 text-xs font-medium text-ink-600">
+              <Icon name="template" className="h-3.5 w-3.5" />
+              五类检查，一次跑完
+            </span>
+
+            <h2
+              id="capabilities-heading"
+              className="mt-5 text-[clamp(1.75rem,3vw,2.5rem)] font-bold leading-[1.2] tracking-tight text-ink-900"
+            >
+              一份资料包进去，
+              <br className="hidden sm:block" />
+              <span className="text-brand-700">五个维度</span>各跑各的规则
+            </h2>
+
+            <p className="mt-4 text-sm leading-7 text-ink-600">
+              最后汇总成一份报告。审核结论全部由规则产出：同一份资料跑两次，结果一致。
+            </p>
+
+            <ul className="mt-8 space-y-5">
+              {CAPABILITIES.map((item) => (
+                <li key={item.title} className="flex gap-3.5">
+                  <span
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${CATEGORY_ICONS[item.category].tone}`}
+                    aria-hidden="true"
+                  >
+                    <Icon name={CATEGORY_ICONS[item.category].icon} className="h-5 w-5" />
+                  </span>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-baseline gap-x-2">
+                      <h3 className="text-sm font-semibold text-ink-900">{item.title}</h3>
+                      <span className="text-xs tabular-nums text-ink-400">
+                        {CATEGORY_HEADLINES[item.category]}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-sm leading-6 text-ink-600">{item.detail}</p>
+                    <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5">
+                      {item.samples.map((sample) => (
+                        <li key={sample.text} className="flex items-center gap-1.5 text-xs text-ink-500">
+                          <span
+                            className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                              sample.status === "fail"
+                                ? "bg-danger-600"
+                                : sample.status === "warn"
+                                  ? "bg-warning-600"
+                                  : "bg-success-600"
+                            }`}
+                            aria-hidden="true"
+                          />
+                          {sample.text}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </li>
+              ))}
+            </ul>
+
+            <p className="mt-6 text-xs leading-5 text-ink-500">
+              上列为各维度的典型情况示意，用于说明这一维度在查什么，不构成审核承诺。
+            </p>
+          </Reveal>
         </div>
-
-        <ul className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {CAPABILITIES.map((item) => (
-            <li key={item.title} className="card p-5">
-              <div className="flex items-center gap-2.5">
-                <span
-                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${CATEGORY_ICONS[item.category].tone}`}
-                  aria-hidden="true"
-                >
-                  <Icon name={CATEGORY_ICONS[item.category].icon} className="h-4 w-4" />
-                </span>
-                <h3 className="text-base font-semibold text-ink-900">{item.title}</h3>
-              </div>
-              <p className="mt-2 text-sm leading-6 text-ink-600">{item.detail}</p>
-              <ul className="mt-4 space-y-1.5 border-t border-ink-100 pt-3">
-                {item.samples.map((sample) => (
-                  <li key={sample.text} className="flex items-center justify-between gap-2">
-                    <span className="truncate text-xs text-ink-500">{sample.text}</span>
-                    <StatusPill status={sample.status} />
-                  </li>
-                ))}
-              </ul>
-            </li>
-          ))}
-        </ul>
-        <p className="mt-6 text-xs leading-5 text-ink-500">
-          上列为各维度的典型情况示意，用于说明这一维度在查什么，不构成审核承诺。
-        </p>
       </div>
     </section>
   );
