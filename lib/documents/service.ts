@@ -155,9 +155,17 @@ export async function expandArchiveDocument(parent: DocumentRow): Promise<Docume
     return [];
   }
 
-  const plan = await planZipExtraction(localPath);
-  if (plan.accepted.length === 0) return [];
-
+  /*
+   * ⚠️ 规划（planZipExtraction）必须和展开一起包在 try 里。
+   *
+   * 曾经它单独在 try 之外：包结构不合法时它抛错，catch 接不到，错误一路冒泡到上传路由。
+   * 结果是「父文档已落库、但 enqueueMany 从未执行」—— 状态永远停在 UPLOADED，
+   * 界面上留下一个不会自己消失、永远转圈的幽灵任务。这是标准的客诉制造机。
+   *
+   * 修法：任何一步失败都把**父文档扭成 FAILED**（并记录原因），让状态机闭环。
+   * 已经展开出来的子文档仍然返回 —— 它们是完整可用的资料，没理由跟着陪葬。
+   */
+  let plan: Awaited<ReturnType<typeof planZipExtraction>>;
   const jobId = await startJob({
     workspaceId: parent.workspaceId,
     documentId: parent.id,
@@ -167,6 +175,12 @@ export async function expandArchiveDocument(parent: DocumentRow): Promise<Docume
   const children: DocumentRow[] = [];
 
   try {
+    plan = await planZipExtraction(localPath);
+    if (plan.accepted.length === 0) {
+      await finishJob({ jobId, status: "SUCCEEDED" });
+      return [];
+    }
+
     await extractZipEntries(localPath, plan.accepted, async (entryPlan, stream) => {
       const childId = newId();
       const childKey = buildStorageKey({
@@ -205,6 +219,12 @@ export async function expandArchiveDocument(parent: DocumentRow): Promise<Docume
     await finishJob({ jobId, status: "SUCCEEDED" });
   } catch (error) {
     const appError = toAppError(error);
+
+    // 关键兜底：父文档必须离开 UPLOADED，否则它会永远卡在「待处理」。
+    await markDocumentFailed(parent.id).catch((markError: unknown) => {
+      logger.error("标记压缩包展开失败状态时出错", { documentId: parent.id, markError });
+    });
+
     await finishJob({
       jobId,
       status: "FAILED",

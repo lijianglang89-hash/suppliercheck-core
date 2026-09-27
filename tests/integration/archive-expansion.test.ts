@@ -19,7 +19,7 @@ import yazl from "yazl";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { closeDatabase, getDb } from "@/lib/db";
-import { documents } from "@/lib/db/schema";
+import { documentProcessingJobs, documents } from "@/lib/db/schema";
 import { createInspectionTransform } from "@/lib/documents/inspect-stream";
 import { enqueueMany, expandArchiveDocument, storeUploadedFile } from "@/lib/documents/service";
 
@@ -224,17 +224,15 @@ describe("ZIP 资料包展开", () => {
   });
 
   /**
-   * 实测行为（不是设计意图，是跑出来的事实）：
-   * yauzl **读取端**就会拒绝 `../` 条目并抛错，错误冒泡到 `expandArchiveDocument`，
-   * 由上传路由的 catch 转成错误响应 —— 不会崩，也确实一条子文档都没展开。
+   * 路径穿越：yauzl **读取端**就会拒绝 `../` 条目并抛错。
    *
-   * ⚠️ 但这里暴露一个真实的状态残留，值得单独记一笔（尚未修，先钉住现状）：
-   *   `storeUploadedFile` 在展开**之前**已把父文档落库，而 `enqueueMany` 在展开**之后**
-   *   才执行。展开抛错 → 父文档留在库里、状态停在 `UPLOADED` / `PENDING`，
-   *   且永远不会被解析入队 —— 界面上会留下一个不会自己消失的「待处理」死条目。
-   *   要不要在展开失败时把它标成 FAILED 是产品决策，本测试先把现状固定住。
+   * ⚠️ 这条用例曾经暴露过一个真实缺陷（已修，本测试是修复的回归网）：
+   *   `planZipExtraction` 原来在 try **之外**，抛错时 catch 接不到、错误冒泡到上传路由，
+   *   于是「父文档已落库但 enqueueMany 从未执行」→ 状态永远停在 UPLOADED，
+   *   界面上留下一个不会自己消失、永远转圈的幽灵任务。
+   * 现在的行为：展开任何一步失败都把父文档扭成 FAILED 并记录原因，状态机闭环。
    */
-  it("★ 手工构造的路径穿越条目被拒：不崩、不落子文档，但父文档会残留", async () => {
+  it("★ 手工构造的路径穿越条目被拒：父文档扭成 FAILED，不留幽灵任务", async () => {
     const user = await createTestUser("ziptrav");
     createdUserIds.push(user.id);
     const workspace = await createTestWorkspace(user.id, "穿越测试工作区");
@@ -244,17 +242,28 @@ describe("ZIP 资料包展开", () => {
 
     const parent = await uploadZip(workspace.id, user.id, malicious);
 
-    await expect(expandArchiveDocument(parent)).rejects.toThrow();
+    // 不再把错误冒泡出去（否则调用方的 enqueueMany 就执行不到了）
+    const children = await expandArchiveDocument(parent);
+    expect(children).toHaveLength(0);
 
     const rows = await getDb()
       .select()
       .from(documents)
       .where(eq(documents.workspaceId, workspace.id));
 
-    // 一条子文档都没有 —— 穿越条目绝没被展开
     expect(rows).toHaveLength(1);
     expect(rows[0]?.id).toBe(parent.id);
-    // 现状：父文档停在 UPLOADED，不会被自动解析（见上方说明）
-    expect(rows[0]?.status).toBe("UPLOADED");
+    // 关键断言：绝不能停在 UPLOADED —— 那是幽灵任务的温床
+    expect(rows[0]?.status).toBe("FAILED");
+    expect(rows[0]?.processingStatus).toBe("FAILED");
+
+    // 失败原因必须留在作业记录里，而不是只写进日志
+    const jobs = await getDb()
+      .select()
+      .from(documentProcessingJobs)
+      .where(eq(documentProcessingJobs.documentId, parent.id));
+    const failed = jobs.find((job) => job.status === "FAILED");
+    expect(failed).toBeDefined();
+    expect(failed?.errorMessage).toBeTruthy();
   });
 });

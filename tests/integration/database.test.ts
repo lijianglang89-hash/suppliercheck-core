@@ -7,20 +7,26 @@ import { eq } from "drizzle-orm";
 
 import { cleanupUsers, createTestUser } from "../helpers/fixtures";
 
-/** 需求第八条列出的全部业务表。 */
+/**
+ * 现有业务表（2026-09-28 实测核对后的清单，不再是「需求第八条」的照抄）。
+ *
+ * ⚠️ 原本这里列的是需求文档里的 12 张表，其中 7 张（questionnaires / questions /
+ * evidence / answers / answer_reviews / audit_reports / exports）**从未有任何代码使用** ——
+ * 它们唯一的使用者就是下面这条「表都存在」的断言，等于用测试给空壳发合格证。
+ * 已随迁移删除（生产库实测 0 行，无数据损失）。
+ *
+ * 教训：把「需求列了」当成「已交付」写进断言，会让不存在的功能在 CI 里长期显示绿色。
+ */
 const EXPECTED_TABLES = [
   "users",
   "workspaces",
   "workspace_members",
   "documents",
   "document_processing_jobs",
-  "questionnaires",
-  "questions",
-  "evidence",
-  "answers",
-  "answer_reviews",
-  "audit_reports",
-  "exports",
+  "suppliers",
+  "review_templates",
+  "review_runs",
+  "review_findings",
 ] as const;
 
 const createdUserIds: string[] = [];
@@ -37,7 +43,7 @@ describe("数据库连接与结构", () => {
     expect(result.latencyMs).toBeGreaterThanOrEqual(0);
   });
 
-  it("需求列出的 12 张表全部存在", async () => {
+  it("业务表全部存在", async () => {
     const db = getDb();
     const result = await db.execute(
       sql`select table_name from information_schema.tables where table_schema = 'public'`,
