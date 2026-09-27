@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 
+import { Icon } from "@/components/ui/icons";
 import { NAV_SECTIONS } from "@/lib/navigation";
 
 /**
@@ -34,10 +35,14 @@ export function NavLinks() {
                     aria-current={active ? "page" : undefined}
                     className={
                       active
-                        ? "block rounded-md bg-brand-50 px-2 py-1.5 text-sm font-medium text-brand-700"
-                        : "block rounded-md px-2 py-1.5 text-sm font-medium text-ink-800 hover:bg-ink-100"
+                        ? "flex items-center gap-2 rounded-md bg-brand-50 px-2 py-1.5 text-sm font-medium text-brand-700"
+                        : "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-ink-800 hover:bg-ink-100"
                     }
                   >
+                    <Icon
+                      name={item.icon}
+                      className={active ? "h-4 w-4 text-brand-600" : "h-4 w-4 text-ink-400"}
+                    />
                     {item.label}
                   </a>
                 </li>

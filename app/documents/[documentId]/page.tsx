@@ -63,7 +63,7 @@ export default async function DocumentDetailPage({
         </Link>
       </div>
 
-      <header className="rounded-lg border border-ink-200 bg-white px-5 py-4">
+      <header className="card px-5 py-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <h1 className="truncate text-lg font-semibold tracking-tight text-ink-900" title={document.originalFilename}>
@@ -117,7 +117,7 @@ export default async function DocumentDetailPage({
 
       <section
         aria-labelledby="supplier-heading"
-        className="rounded-lg border border-ink-200 bg-white px-5 py-4"
+        className="card px-5 py-4"
       >
         <h2 id="supplier-heading" className="text-sm font-semibold text-ink-900">
           归属供应商
@@ -163,7 +163,7 @@ export default async function DocumentDetailPage({
         )}
       </section>
 
-      <section className="rounded-lg border border-ink-200 bg-white">
+      <section className="card">
         <div className="flex items-center justify-between border-b border-ink-100 px-5 py-3">
           <h2 className="text-sm font-semibold text-ink-900">文本提取</h2>
           {extraction && (

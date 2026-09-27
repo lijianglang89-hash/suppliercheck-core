@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { archiveSupplierAction, deleteSupplierAction, restoreSupplierAction } from "@/app/actions/suppliers";
 import { SupplierCreateForm, SupplierEditForm, type SupplierFormValues } from "@/components/suppliers/supplier-forms";
+import { EmptyState } from "@/components/ui/empty-state";
 import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 import { requireActionWorkspace } from "@/lib/auth/action-context";
 import { countDocumentsBySupplier } from "@/lib/documents/repository";
@@ -46,7 +47,7 @@ export default async function SuppliersPage() {
 
       <section
         aria-labelledby="create-supplier-heading"
-        className="rounded-lg border border-ink-200 bg-white p-5"
+        className="card p-5"
       >
         <h2 id="create-supplier-heading" className="text-sm font-semibold text-ink-900">
           新增供应商
@@ -62,11 +63,18 @@ export default async function SuppliersPage() {
         </h2>
 
         {active.length === 0 ? (
-          <p className="rounded-lg border border-ink-200 bg-white px-5 py-8 text-center text-sm text-ink-500">
-            还没有登记供应商。供应商不是发起点审核的必要条件 ——
-            先用上方表单登记，或直接在<Link href="/reviews" className="mx-1 text-brand-700 hover:underline">资料审核</Link>
-            里选择资料发起审核。
-          </p>
+          <EmptyState
+            icon="building"
+            title="还没有登记供应商"
+            hint="供应商不是发起审核的必要条件 —— 可以用上方表单登记，或直接在资料审核里选择资料发起。登记后，审核会用主体名称与统一社会信用代码核对资料一致性。"
+          >
+            <Link
+              href="/reviews"
+              className="rounded-md border border-ink-300 bg-white px-3 py-2 text-sm font-medium text-ink-700 hover:bg-ink-50"
+            >
+              直接去发起审核
+            </Link>
+          </EmptyState>
         ) : (
           <ul className="space-y-3">
             {active.map((supplier) => (
@@ -126,7 +134,7 @@ function SupplierCard({
   };
 
   return (
-    <li className="rounded-lg border border-ink-200 bg-white">
+    <li className="card">
       <div className="flex flex-wrap items-start justify-between gap-3 px-5 py-4">
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-ink-900">{supplier.name}</p>

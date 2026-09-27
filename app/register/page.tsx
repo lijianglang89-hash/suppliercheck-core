@@ -36,7 +36,7 @@ export default async function RegisterPage() {
           创建账号后会自动为你建立一个工作区，资料按工作区隔离存放。
         </p>
 
-        <div className="mt-8 rounded-lg border border-ink-200 bg-white p-6">
+        <div className="mt-8 card p-6">
           <AuthForm mode="register" action={registerAction} />
         </div>
 

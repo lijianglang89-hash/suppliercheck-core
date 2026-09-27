@@ -92,7 +92,7 @@ export default async function ReviewsPage({
 
       <section
         aria-labelledby="create-review-heading"
-        className="rounded-lg border border-ink-200 bg-white p-5"
+        className="card p-5"
       >
         <h2 id="create-review-heading" className="text-sm font-semibold text-ink-900">
           发起一次审核
@@ -114,7 +114,7 @@ export default async function ReviewsPage({
         </div>
       </section>
 
-      <section aria-labelledby="run-list-heading" className="rounded-lg border border-ink-200 bg-white">
+      <section aria-labelledby="run-list-heading" className="card">
         <div className="border-b border-ink-100 px-5 py-3">
           <h2 id="run-list-heading" className="text-sm font-semibold text-ink-900">
             审核记录
@@ -182,7 +182,7 @@ export default async function ReviewsPage({
         )}
       </section>
 
-      <section className="rounded-lg border border-ink-200 bg-white px-5 py-4 text-xs leading-relaxed text-ink-600">
+      <section className="card px-5 py-4 text-xs leading-relaxed text-ink-600">
         <h2 className="text-sm font-semibold text-ink-900">关于审核能力的说明</h2>
         <ul className="mt-2 list-disc space-y-1 pl-5">
           <li>

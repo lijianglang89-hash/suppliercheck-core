@@ -52,6 +52,15 @@ export const SEVERITY_ACCENT_CLASS: Record<Severity, string> = {
   INFO: "border-l-ink-300",
 };
 
+/** 严重度分布条的段色。颜色与 SEVERITY_ACCENT_CLASS 一一对应，不另起一套。 */
+export const SEVERITY_BAR_CLASS: Record<Severity, string> = {
+  CRITICAL: "bg-red-500",
+  HIGH: "bg-orange-500",
+  MEDIUM: "bg-amber-400",
+  LOW: "bg-sky-400",
+  INFO: "bg-ink-300",
+};
+
 /* --------------------------------- 类别 --------------------------------- */
 
 export const CATEGORY_LABELS: Record<FindingCategory, string> = {

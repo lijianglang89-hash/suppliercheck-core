@@ -50,7 +50,7 @@ export default async function LoginPage(props: PageProps<"/login">) {
         <h1 className="text-2xl font-semibold tracking-tight text-ink-900">登录</h1>
         <p className="mt-2 text-sm text-ink-600">使用邮箱和密码登录你的供应商智审账号。</p>
 
-        <div className="mt-8 rounded-lg border border-ink-200 bg-white p-6">
+        <div className="mt-8 card p-6">
           <AuthForm mode="login" action={loginAction} nextPath={nextParam ? nextPath : undefined} />
         </div>
       </main>

@@ -126,7 +126,7 @@ export function DocumentUploader({ workspaceId, maxBytes }: UploaderProps) {
   );
 
   return (
-    <section aria-labelledby="upload-heading" className="rounded-lg border border-ink-200 bg-white">
+    <section aria-labelledby="upload-heading" className="card">
       <div className="border-b border-ink-100 px-5 py-3">
         <h2 id="upload-heading" className="text-sm font-semibold text-ink-900">
           上传供应商资料

@@ -55,7 +55,7 @@ export default async function ReportPage({
         <Link href="/reviews" className="text-xs text-brand-700 hover:underline">
           ← 返回资料审核
         </Link>
-        <p className="rounded-lg border border-ink-200 bg-white px-5 py-10 text-center text-sm text-ink-500">
+        <p className="card px-5 py-10 text-center text-sm text-ink-500">
           该审核尚未完成，暂时没有报告。
         </p>
       </div>
@@ -81,7 +81,7 @@ export default async function ReportPage({
         </Link>
       </div>
 
-      <article className="rounded-lg border border-ink-200 bg-white px-8 py-7">
+      <article className="card px-8 py-7">
         <header className="border-b border-ink-200 pb-5">
           <p className="text-xs uppercase tracking-wider text-ink-400">
             {siteConfig.name} · 审核报告

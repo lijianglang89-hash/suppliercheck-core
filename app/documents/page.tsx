@@ -3,6 +3,8 @@ import Link from "next/link";
 import { AutoRefresh } from "@/components/documents/auto-refresh";
 import { ReprocessButton } from "@/components/documents/reprocess-button";
 import { DocumentUploader } from "@/components/documents/uploader";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Icon, type IconName } from "@/components/ui/icons";
 import { requireUser, requireWorkspaceAccess } from "@/lib/auth/guards";
 import { ensureWorkspaceForUser } from "@/lib/auth/workspaces";
 import { getEnv } from "@/lib/config/server-env";
@@ -70,10 +72,10 @@ export default async function DocumentsPage() {
       </header>
 
       <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="资料总数" value={counts.total} />
-        <Stat label="可查看" value={counts.ready} />
-        <Stat label="解析中" value={counts.pending} />
-        <Stat label="解析失败" value={counts.failed} />
+        <Stat label="资料总数" value={counts.total} icon="file" />
+        <Stat label="可查看" value={counts.ready} icon="check-circle" tone="text-success-600 bg-emerald-50" />
+        <Stat label="解析中" value={counts.pending} icon="clock" tone="text-brand-700 bg-brand-50" />
+        <Stat label="解析失败" value={counts.failed} icon="alert-triangle" tone="text-danger-600 bg-red-50" />
       </dl>
 
       <DocumentUploader workspaceId={authorized.id} maxBytes={env.MAX_UPLOAD_BYTES} />
@@ -115,7 +117,7 @@ export default async function DocumentsPage() {
         </div>
       </section>
 
-      <section aria-labelledby="list-heading" className="rounded-lg border border-ink-200 bg-white">
+      <section aria-labelledby="list-heading" className="card">
         <div className="flex items-center justify-between border-b border-ink-100 px-5 py-3">
           <h2 id="list-heading" className="text-sm font-semibold text-ink-900">
             已上传资料
@@ -124,9 +126,13 @@ export default async function DocumentsPage() {
         </div>
 
         {rows.length === 0 ? (
-          <p className="px-5 py-8 text-center text-sm text-ink-500">
-            还没有资料。请使用上方的上传区域添加供应商资料包。
-          </p>
+          <div className="p-4">
+            <EmptyState
+              icon="upload"
+              title="还没有资料"
+              hint="使用上方的上传区域添加供应商资料包；解析完成后即可发起审核。"
+            />
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[840px] border-collapse text-sm">
@@ -173,7 +179,12 @@ export default async function DocumentsPage() {
                           <span className="text-ink-400">未归属</span>
                         )}
                       </td>
-                      <td className="px-3 py-3 text-ink-600">{mimeTypeLabel(row.mimeType)}</td>
+                      <td className="px-3 py-3">
+                        <span className="flex items-center gap-1.5 text-ink-600">
+                          <Icon name={mimeTypeIcon(row.mimeType)} className="h-3.5 w-3.5 text-ink-400" />
+                          {mimeTypeLabel(row.mimeType)}
+                        </span>
+                      </td>
                       <td className="px-3 py-3 text-ink-600">{formatBytes(row.size)}</td>
                       <td className="px-3 py-3">
                         <span
@@ -227,7 +238,7 @@ export default async function DocumentsPage() {
         )}
       </section>
 
-      <section className="rounded-lg border border-ink-200 bg-white px-5 py-4 text-xs leading-relaxed text-ink-600">
+      <section className="card rounded-lg px-5 py-4 text-xs leading-relaxed text-ink-600">
         <h2 className="text-sm font-semibold text-ink-900">关于解析能力的说明</h2>
         <ul className="mt-2 list-disc space-y-1 pl-5">
           <li>所有文件存放在私有目录，只能通过登录后的授权接口下载，不产生任何公开链接。</li>
@@ -240,11 +251,33 @@ export default async function DocumentsPage() {
   );
 }
 
-function Stat({ label, value }: { label: string; value: number }) {
+function Stat({
+  label,
+  value,
+  icon,
+  tone = "text-brand-700 bg-brand-50",
+}: {
+  label: string;
+  value: number;
+  icon: IconName;
+  tone?: string;
+}) {
   return (
-    <div className="rounded-lg border border-ink-200 bg-white px-4 py-3">
-      <dt className="text-xs text-ink-500">{label}</dt>
-      <dd className="mt-1 text-lg font-semibold text-ink-900">{value}</dd>
+    <div className="card px-4 py-3">
+      <dt className="flex items-center gap-1.5 text-xs text-ink-500">
+        <span className={`flex h-5 w-5 items-center justify-center rounded ${tone}`} aria-hidden="true">
+          <Icon name={icon} className="h-3 w-3" />
+        </span>
+        {label}
+      </dt>
+      <dd className="mt-1.5 text-lg font-semibold text-ink-900">{value}</dd>
     </div>
   );
+}
+
+/** 文件类型 → 图标。图片和压缩包有专属图标，其余一律通用文件。 */
+function mimeTypeIcon(mimeType: string): IconName {
+  if (mimeType.startsWith("image/")) return "image";
+  if (mimeType === "application/zip") return "archive";
+  return "file";
 }

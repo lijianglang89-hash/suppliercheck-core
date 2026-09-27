@@ -1,5 +1,6 @@
 import { logoutAction } from "@/app/actions/auth";
 import { NavLinks } from "@/components/dashboard/nav-links";
+import { Topbar } from "@/components/dashboard/topbar";
 import { siteConfig } from "@/lib/site";
 
 interface DashboardShellProps {
@@ -42,20 +43,25 @@ export function DashboardShell({ user, workspace, children }: DashboardShellProp
       </aside>
 
       <div className="flex flex-1 flex-col">
-        <header className="flex h-16 items-center justify-between border-b border-ink-200 bg-white px-6">
-          <div className="min-w-0">
-            <p className="truncate text-sm font-medium text-ink-800">{user.displayName}</p>
-            <p className="truncate text-xs text-ink-500">{user.email}</p>
-          </div>
+        <header className="sticky top-0 z-10 flex h-14 items-center justify-between gap-4 border-b border-ink-200 bg-white px-6">
+          <Topbar workspaceName={workspace.name} />
 
-          <form action={logoutAction}>
-            <button
-              type="submit"
-              className="rounded-md border border-ink-300 bg-white px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-ink-50"
-            >
-              退出登录
-            </button>
-          </form>
+          <div className="flex shrink-0 items-center gap-3">
+            <div className="hidden text-right sm:block">
+              <p className="truncate text-sm font-medium leading-4 text-ink-800">
+                {user.displayName}
+              </p>
+              <p className="truncate text-xs leading-4 text-ink-400">{user.email}</p>
+            </div>
+            <form action={logoutAction}>
+              <button
+                type="submit"
+                className="rounded-md border border-ink-300 bg-white px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-ink-50"
+              >
+                退出登录
+              </button>
+            </form>
+          </div>
         </header>
 
         <main id="main" className="flex-1 px-6 py-8">

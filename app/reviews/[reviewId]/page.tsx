@@ -63,7 +63,7 @@ export default async function ReviewDetailPage({
         </Link>
       </div>
 
-      <header className="rounded-lg border border-ink-200 bg-white px-5 py-4">
+      <header className="card px-5 py-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <h1 className="truncate text-lg font-semibold tracking-tight text-ink-900">{run.name}</h1>
@@ -129,7 +129,7 @@ export default async function ReviewDetailPage({
           </h2>
 
           {findings.length === 0 ? (
-            <p className="rounded-lg border border-ink-200 bg-white px-5 py-8 text-center text-sm text-ink-500">
+            <p className="card px-5 py-8 text-center text-sm text-ink-500">
               本次审核没有发现问题。请先确认上面的覆盖度说明（查了多少资料）再下结论。
             </p>
           ) : (
@@ -176,7 +176,7 @@ export default async function ReviewDetailPage({
         </section>
       ) : null}
 
-      <section className="rounded-lg border border-ink-200 bg-white px-5 py-4 text-xs leading-relaxed text-ink-600">
+      <section className="card px-5 py-4 text-xs leading-relaxed text-ink-600">
         <h2 className="text-sm font-semibold text-ink-900">本次审核使用的模板配置</h2>
         <dl className="mt-2 grid gap-2 sm:grid-cols-2">
           <div>
@@ -229,7 +229,7 @@ function SummarySection({ summary }: { summary: Partial<ReviewSummary> }) {
   const counts = summary.findingsBySeverity ?? ({} as Partial<Record<Severity, number>>);
 
   return (
-    <section aria-labelledby="summary-heading" className="rounded-lg border border-ink-200 bg-white">
+    <section aria-labelledby="summary-heading" className="card">
       <div className="border-b border-ink-100 px-5 py-3">
         <h2 id="summary-heading" className="text-sm font-semibold text-ink-900">
           本次审核概览

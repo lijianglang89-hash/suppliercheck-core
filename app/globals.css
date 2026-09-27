@@ -43,6 +43,11 @@
   /* 更浅的蓝灰：用于文件卡、流程节点的底 */
   --color-brand-mist: #f2f6f9;
 
+  /* 应用画布底色：比 ink-50 深一档。
+     白卡片（#fff）与画布的明度差必须肉眼可辨，卡片才能"浮"在页面上 ——
+     之前 #f7f8f9 vs #fff 明度差不足 6%，整页看起来是平的。 */
+  --color-canvas: #eef1f5;
+
   --color-success-600: #1f7a4d;
   --color-warning-600: #a35a06;
   --color-danger-600: #b3261e;
@@ -55,11 +60,23 @@ html {
 }
 
 body {
-  background-color: var(--color-ink-50);
+  background-color: var(--color-canvas);
   color: var(--color-ink-800);
   font-family: var(--font-sans);
   font-feature-settings: "tnum" 1;
   -webkit-font-smoothing: antialiased;
+}
+
+/*
+ * 应用内卡片基座：白底 + 细边框 + 极浅投影。
+ * Stripe 式双层分离 —— 边框定边界，1px 投影提供"浮起"的暗示。
+ * 新区块一律用它，不要再手写 `border border-ink-200 bg-white`。
+ */
+.card {
+  background-color: #fff;
+  border: 1px solid var(--color-ink-200);
+  border-radius: var(--radius-card);
+  box-shadow: 0 1px 2px rgb(22 26 33 / 0.05);
 }
 
 /* 焦点可见性：键盘用户优先，符合企业采购/合规类产品的可达性要求 */

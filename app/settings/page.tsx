@@ -42,7 +42,7 @@ export default async function SettingsPage() {
 
       <section
         aria-labelledby="workspace-heading"
-        className="rounded-lg border border-ink-200 bg-white p-5"
+        className="card p-5"
       >
         <h2 id="workspace-heading" className="text-sm font-semibold text-ink-900">
           工作区
@@ -54,7 +54,7 @@ export default async function SettingsPage() {
 
       <section
         aria-labelledby="profile-heading"
-        className="rounded-lg border border-ink-200 bg-white p-5"
+        className="card p-5"
       >
         <h2 id="profile-heading" className="text-sm font-semibold text-ink-900">
           账号资料
@@ -66,7 +66,7 @@ export default async function SettingsPage() {
 
       <section
         aria-labelledby="password-heading"
-        className="rounded-lg border border-ink-200 bg-white p-5"
+        className="card p-5"
       >
         <h2 id="password-heading" className="text-sm font-semibold text-ink-900">
           修改密码
@@ -78,7 +78,7 @@ export default async function SettingsPage() {
 
       <section
         aria-labelledby="engine-heading"
-        className="rounded-lg border border-ink-200 bg-white p-5"
+        className="card p-5"
       >
         <h2 id="engine-heading" className="text-sm font-semibold text-ink-900">
           审核引擎

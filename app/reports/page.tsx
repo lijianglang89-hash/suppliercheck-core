@@ -1,5 +1,8 @@
 import Link from "next/link";
 
+import { EmptyState } from "@/components/ui/empty-state";
+import { Icon } from "@/components/ui/icons";
+import { SeverityBar } from "@/components/ui/severity-bar";
 import { requireActionWorkspace } from "@/lib/auth/action-context";
 import { SEVERITY_BADGE_CLASS, SEVERITY_LABELS } from "@/lib/reviews/labels";
 import { countFindingsByRuns, listWorkspaceReviewRuns } from "@/lib/reviews/repository";
@@ -46,22 +49,32 @@ export default async function ReportsPage() {
       </header>
 
       {runs.length === 0 ? (
-        <p className="rounded-lg border border-ink-200 bg-white px-5 py-10 text-center text-sm text-ink-500">
-          还没有已完成的审核报告。
-        </p>
+        <EmptyState
+          icon="file-check"
+          title="还没有已完成的审核报告"
+          hint="在资料审核里选择模板与资料发起一次审核，通常几十秒内出结论；执行中或失败的审核在资料审核页查看。"
+        >
+          <Link
+            href="/reviews"
+            className="rounded-md bg-brand-700 px-3 py-2 text-sm font-medium text-white hover:bg-brand-800"
+          >
+            去发起审核
+          </Link>
+        </EmptyState>
       ) : (
         <ul className="space-y-3">
           {runs.map((run) => {
             const counts = countsByRun.get(run.id) ?? {};
             const blocking = (counts.CRITICAL ?? 0) + (counts.HIGH ?? 0);
             return (
-              <li key={run.id} className="rounded-lg border border-ink-200 bg-white px-5 py-4">
+              <li key={run.id} className="card px-5 py-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <Link
                       href={`/reports/${run.id}`}
-                      className="block truncate text-sm font-semibold text-brand-700 hover:underline"
+                      className="flex items-center gap-1.5 truncate text-sm font-semibold text-brand-700 hover:underline"
                     >
+                      <Icon name="file-check" className="h-4 w-4 shrink-0 text-brand-500" />
                       {run.name}
                     </Link>
                     <p className="mt-1 text-xs text-ink-500">
@@ -78,7 +91,8 @@ export default async function ReportsPage() {
                     </p>
                   </div>
 
-                  <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+                  <div className="flex shrink-0 flex-wrap items-center gap-2">
+                    <SeverityBar counts={counts} />
                     {SEVERITIES.filter((severity) => (counts[severity] ?? 0) > 0).map((severity) => (
                       <span
                         key={severity}
@@ -96,7 +110,8 @@ export default async function ReportsPage() {
                 </div>
 
                 {blocking > 0 ? (
-                  <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-danger-600">
+                  <p className="mt-3 flex items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-danger-600">
+                    <Icon name="alert-triangle" className="h-3.5 w-3.5 shrink-0" />
                     存在 {blocking} 条阻断项，建议先让供应商补正资料再继续。
                   </p>
                 ) : null}
