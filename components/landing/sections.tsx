@@ -426,30 +426,35 @@ const WORKFLOW: ReadonlyArray<{
   step: string;
   title: string;
   detail: string;
+  icon: IconName;
   snippet: { kind: "files" | "text" | "rules" | "report"; note: string };
 }> = [
   {
     step: "01",
     title: "上传资料包",
     detail: "PDF、Word、Excel、图片与 ZIP，一次上传；压缩包自动展开成独立条目。",
+    icon: "upload",
     snippet: { kind: "files", note: "支持 PDF / DOCX / XLSX / PNG / JPG / ZIP" },
   },
   {
     step: "02",
     title: "提取正文",
     detail: "解析文件内容，提取可用于核对的文本；扫不出正文的如实标注，不伪造内容。",
+    icon: "file",
     snippet: { kind: "text", note: "提取状态：可查看 / 待处理 / 失败" },
   },
   {
     step: "03",
     title: "规则校验",
     detail: "按模板启用的规则逐条跑，命中即生成一条带严重级别的发现。",
+    icon: "clipboard",
     snippet: { kind: "rules", note: "已启用规则数随模板配置变化" },
   },
   {
     step: "04",
     title: "输出报告",
     detail: "按严重级别排序，每条附所在文件与原文摘录，可直接用浏览器打印导出。",
+    icon: "file-check",
     snippet: { kind: "report", note: "报告页支持打印 / 另存为 PDF" },
   },
 ];
@@ -551,8 +556,14 @@ export function WorkflowSection() {
                   className="absolute left-0 top-4 hidden h-px w-5 bg-ink-300 lg:block"
                 />
               ) : null}
-              <span className="flex h-8 w-8 items-center justify-center rounded-md bg-brand-600 text-xs font-semibold tabular-nums text-white">
-                {item.step}
+              <span className="flex items-center gap-2">
+                <span
+                  className="flex h-8 w-8 items-center justify-center rounded-md bg-brand-600 text-white"
+                  aria-hidden="true"
+                >
+                  <Icon name={item.icon} className="h-4 w-4" />
+                </span>
+                <span className="text-xs font-semibold tabular-nums text-ink-400">{item.step}</span>
               </span>
               <h3 className="mt-3 text-base font-semibold text-ink-900">{item.title}</h3>
               <p className="mt-2 text-sm leading-6 text-ink-600">{item.detail}</p>
