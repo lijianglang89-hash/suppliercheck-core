@@ -145,7 +145,7 @@ export default function HomePage() {
             ③ 两个破形浮层：绝对定位 + 4px 白边 + 2xl 阴影，从主界面上弹出来
           小屏下浮层退回普通堆叠，绝不让它们在窄屏溢出破版。
         */}
-        <section className="border-b border-ink-200 bg-white">
+        <section className="overflow-x-clip border-b border-ink-200 bg-white">
           <div className="mx-auto w-full max-w-6xl px-6 py-24 lg:py-32">
             <div className="grid items-center gap-14 lg:grid-cols-5 lg:gap-10">
               {/* 左：40% */}
@@ -217,7 +217,13 @@ export default function HomePage() {
               <div className="relative lg:col-span-3">
                 <div aria-hidden="true" className="dot-grid absolute -inset-8 rounded-2xl" />
 
-                <div className="relative">
+                {/*
+                  pb-16 是给左下浮层留的落位空间。
+                  浮层必须落在**空白处**：实测过 -bottom-10/-left-10 的写法，
+                  它会压住发现清单最后一行（重叠 3477px²）—— 破形是让它跳出容器，
+                  不是让它盖住内容。
+                */}
+                <div className="relative lg:pb-16">
                   <div className="flex items-baseline justify-between gap-3 pb-2">
                     <p className="text-sm font-semibold text-ink-900">审核报告</p>
                     <span className="rounded bg-ink-100 px-2 py-0.5 text-[11px] text-ink-500">
@@ -227,22 +233,22 @@ export default function HomePage() {
 
                   <ReportFragment rows={HERO_FRAGMENT} />
 
-                  {/* 破形浮层 1：向左下溢出交界线 */}
+                  {/* 破形浮层 1：落在主卡下方留出的空白里，向左溢出交界线 */}
                   <FloatCard
                     tone="danger"
                     icon="alert-triangle"
                     title="证照已过期"
                     detail="ISO9001 证书 · 阻断项"
-                    className="mt-3 lg:absolute lg:-bottom-10 lg:-left-10 lg:mt-0"
+                    className="mt-3 lg:absolute lg:bottom-0 lg:-left-6 lg:mt-0"
                   />
 
-                  {/* 破形浮层 2：向右上溢出 */}
+                  {/* 破形浮层 2：向右上溢出到页面留白；上移 80px 避开「审核报告」标题行 */}
                   <FloatCard
                     tone="success"
                     icon="check-circle"
                     title="统一社会信用代码校验通过"
                     detail="GB 32100 · 校验位一致"
-                    className="mt-3 lg:absolute lg:-right-8 lg:-top-12 lg:mt-0"
+                    className="mt-3 lg:absolute lg:-right-6 lg:-top-20 lg:mt-0"
                   />
                 </div>
               </div>

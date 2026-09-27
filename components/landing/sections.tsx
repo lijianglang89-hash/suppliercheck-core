@@ -35,13 +35,36 @@ import { Icon, type IconName } from "@/components/ui/icons";
  * 第一反应本来应该是"通过"，用多了这个反应就没了。
  * 维度的区分交给图标形状，好坏交给状态 pill。
  */
-const CATEGORY_ICONS: Record<FindingCategory, { icon: IconName; tone: string }> = {
-  COMPLETENESS: { icon: "clipboard", tone: "bg-brand-50 text-brand-700" },
-  READABILITY: { icon: "file", tone: "bg-ink-100 text-ink-600" },
-  ENTITY: { icon: "building", tone: "bg-brand-50 text-brand-700" },
-  VALIDITY: { icon: "clock", tone: "bg-ink-100 text-ink-600" },
-  CONSISTENCY: { icon: "check-circle", tone: "bg-brand-50 text-brand-700" },
-  AI: { icon: "settings", tone: "bg-ink-100 text-ink-600" },
+const CATEGORY_ICONS: Record<
+  FindingCategory,
+  { icon: IconName; tone: string; darkTone: string }
+> = {
+  COMPLETENESS: {
+    icon: "clipboard",
+    tone: "bg-brand-50 text-brand-700",
+    darkTone: "bg-white/10 text-white",
+  },
+  READABILITY: {
+    icon: "file",
+    tone: "bg-ink-100 text-ink-600",
+    darkTone: "bg-white/5 text-white/70",
+  },
+  ENTITY: {
+    icon: "building",
+    tone: "bg-brand-50 text-brand-700",
+    darkTone: "bg-white/10 text-white",
+  },
+  VALIDITY: {
+    icon: "clock",
+    tone: "bg-ink-100 text-ink-600",
+    darkTone: "bg-white/5 text-white/70",
+  },
+  CONSISTENCY: {
+    icon: "check-circle",
+    tone: "bg-brand-50 text-brand-700",
+    darkTone: "bg-white/10 text-white",
+  },
+  AI: { icon: "settings", tone: "bg-ink-100 text-ink-600", darkTone: "bg-white/5 text-white/70" },
 };
 
 /**
@@ -313,6 +336,20 @@ const CATEGORY_HEADLINES: Record<string, string> = {
  * 如果这里是手写数组，有人加一条规则而忘了改首页，首页就会开始说谎，
  * 而且没有任何测试能发现 —— 从源数据读，新增规则当天首页就会多一行。
  */
+/**
+ * 深色反转区块：全站唯一的深底 section。
+ *
+ * 作用是在中段制造一次"唤醒" —— 上半页一路白/浅蓝/浅灰，视觉张力会衰减，
+ * 深底块像断点一样把注意力拉回来（PingCAP / 阿里云这类硬核技术站的标准做法）。
+ *
+ * 三条纪律：
+ * 1. 卡片用**半透明白**（bg-white/5 + border-white/10），融进底色而不是死板的黑块；
+ *    1px 半透明白边是深色下勾勒物理边缘的关键，不能省。
+ * 2. 语义色在这里只做**幽灵徽章**（透明底 + 语义色边框/文字），
+ *    依然不拿它当装饰（docs/BRAND.md §3）。
+ * 3. 底部不做"深→白渐变"：渐变必然经过一段脏灰，反而显廉价。
+ *    用大 padding 让空间当隔离带（py-24 / pb-28）。
+ */
 export function RulesSection() {
   const groups = CATEGORY_ORDER.map((category) => ({
     category,
@@ -321,49 +358,67 @@ export function RulesSection() {
   })).filter((group) => group.rules.length > 0);
 
   return (
-    <section aria-labelledby="rules-heading" className="border-b border-ink-200 bg-band-alt">
-      <div className="mx-auto w-full max-w-6xl px-6 py-16 lg:py-20">
-        <h2 id="rules-heading" className="text-2xl font-semibold tracking-tight text-ink-900">
+    <section
+      aria-labelledby="rules-heading"
+      className="bg-brand-900 py-24 pb-28 lg:py-28 lg:pb-32"
+    >
+      <div className="mx-auto w-full max-w-6xl px-6">
+        <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-medium text-brand-100">
+          <Icon name="clipboard" className="h-3.5 w-3.5" />
+          规则引擎 · 确定性输出
+        </span>
+
+        <h2
+          id="rules-heading"
+          className="mt-6 text-[clamp(1.75rem,3vw,2.5rem)] font-bold leading-[1.2] tracking-tight text-white sm:whitespace-nowrap"
+        >
           不是一句「系统判断」，是 {REVIEW_RULES.length} 条写明的规则
         </h2>
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-ink-600">
+        <p className="mt-4 max-w-2xl text-sm leading-7 text-white/70">
           每条规则检查什么、什么情况下标记「问题」、什么情况下不下结论，都在下面列着。
           规则清单也是你可以自己关掉的：在审核模板里不勾选的规则不会出现在任何结论里。
         </p>
 
         {/* 先讲机制的确定性：点按钮之前就知道这条规则什么条件下会报警、会不会替人下结论 */}
-        <div className="mt-8">
-          <RulePipeline />
+        <div className="mt-10">
+          <RulePipeline tone="dark" />
         </div>
 
         <div className="mt-10 grid gap-6 lg:grid-cols-2">
           {groups.map((group) => (
-            <div key={group.category} className="card p-5">
+            <div
+              key={group.category}
+              className="rounded-lg border border-white/10 bg-white/5 p-5 transition-all duration-200 hover:-translate-y-1 hover:border-white/20 hover:bg-white/10"
+            >
               <div className="flex items-baseline justify-between gap-3">
                 <span className="flex items-center gap-2.5">
                   <span
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${CATEGORY_ICONS[group.category].tone}`}
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${CATEGORY_ICONS[group.category].darkTone}`}
                     aria-hidden="true"
                   >
                     <Icon name={CATEGORY_ICONS[group.category].icon} className="h-4 w-4" />
                   </span>
-                  <h3 className="text-base font-semibold text-ink-900">{group.label}</h3>
+                  <h3 className="text-base font-semibold text-white">{group.label}</h3>
                 </span>
-                <span className="shrink-0 text-xs tabular-nums text-ink-500">
+                <span className="shrink-0 rounded border border-white/15 px-2 py-0.5 text-xs tabular-nums text-brand-100">
                   {group.rules.length} 条
                 </span>
               </div>
-              <ul className="mt-3 divide-y divide-ink-200">
+              <ul className="mt-3 divide-y divide-white/10">
                 {group.rules.map((rule) => (
                   <li key={rule.id} className="py-2">
-                    <p className="text-sm font-medium text-ink-800">{rule.label}</p>
-                    <p className="mt-0.5 text-xs leading-5 text-ink-600">{rule.description}</p>
+                    <p className="text-sm font-medium text-white">{rule.label}</p>
+                    <p className="mt-0.5 text-xs leading-5 text-white/60">{rule.description}</p>
                   </li>
                 ))}
               </ul>
             </div>
           ))}
         </div>
+
+        <p className="mt-10 border-t border-white/10 pt-6 text-xs leading-6 text-white/50">
+          同一份资料跑两次结果一致 —— 规则不依赖模型推测，也没有随机性。
+        </p>
       </div>
     </section>
   );

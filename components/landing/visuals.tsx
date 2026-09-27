@@ -141,7 +141,7 @@ export function CheckFanout({
  * 所以这里只呈现**结构**：命中 → 定级 → 附摘录 → 进报告。
  * 讲机制而不是讲结果，就不需要「示例数据」的免责前提。
  */
-export function RulePipeline() {
+export function RulePipeline({ tone = "light" }: { tone?: "light" | "dark" }) {
   const steps = [
     { title: "命中", detail: "资料正文满足规则条件" },
     { title: "定级", detail: "严重 / 高 / 中 / 低 / 提示" },
@@ -149,17 +149,34 @@ export function RulePipeline() {
     { title: "进报告", detail: "按严重级别排序呈现" },
   ];
 
+  const dark = tone === "dark";
+
   return (
     <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       {steps.map((step, index) => (
-        <li key={step.title} className="card px-3 py-2.5">
+        <li
+          key={step.title}
+          className={
+            dark
+              ? "rounded-md border border-white/10 bg-white/5 px-3 py-2.5"
+              : "card px-3 py-2.5"
+          }
+        >
           <div className="flex items-center gap-2">
-            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-brand-600 text-[10px] font-semibold tabular-nums text-white">
+            <span
+              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded text-[10px] font-semibold tabular-nums ${
+                dark ? "bg-white/15 text-white" : "bg-brand-600 text-white"
+              }`}
+            >
               {index + 1}
             </span>
-            <span className="text-xs font-medium text-ink-800">{step.title}</span>
+            <span className={`text-xs font-medium ${dark ? "text-white" : "text-ink-800"}`}>
+              {step.title}
+            </span>
           </div>
-          <p className="mt-1.5 text-[11px] leading-4 text-ink-500">{step.detail}</p>
+          <p className={`mt-1.5 text-[11px] leading-4 ${dark ? "text-white/60" : "text-ink-500"}`}>
+            {step.detail}
+          </p>
         </li>
       ))}
     </ol>
