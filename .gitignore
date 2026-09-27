@@ -70,3 +70,4 @@ docs/screenshots/
 # 由 scripts/seo/search-console.mjs 生成，绝不能入库
 .workbuddy/seo-profile/
 *-state.json
+suppliercheck-review-pack-*.zip
