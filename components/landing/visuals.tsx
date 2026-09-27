@@ -71,6 +71,126 @@ export function FlowArrow() {
 }
 
 /**
+ * 5 类检查的总览 —— 「一份资料包进去，五个维度分别有事没事」。
+ *
+ * ⚠️ 刻意**不用**放射状的连线图：那种图在大屏上好看，落到 390px 就会挤成一团，
+ * 而且连接线是纯装饰，没有任何信息量。这里用「汇总条 + 横向五段」，
+ * 每一段自带真实规则条数与自己的状态 —— 状态色不统一才有意义
+ * （docs/DESIGN.md §2：五个维度同时全绿的产品截图反而说明图是画出来的）。
+ *
+ * `count` 由调用方从 REVIEW_RULES 现算传入，不在这里写死。
+ */
+export function CheckFanout({
+  groups,
+}: {
+  groups: readonly {
+    label: string;
+    count: number;
+    status: Status;
+    headline: string;
+  }[];
+}) {
+  return (
+    <div className="rounded-lg border border-ink-200 bg-white p-4">
+      <div className="flex items-center justify-between gap-3 rounded-md bg-brand-mist px-3 py-2">
+        <span className="text-sm font-medium text-ink-800">供应商资料包</span>
+        <span className="text-[11px] text-ink-500">一次导入 · 并发核对</span>
+      </div>
+
+      <div className="my-2 flex justify-center text-ink-300" aria-hidden="true">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <path d="M12 5v14M6 13l6 6 6-6" />
+        </svg>
+      </div>
+
+      <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+        {groups.map((group) => (
+          <li
+            key={group.label}
+            className="rounded-md border border-ink-200 bg-brand-mist px-2.5 py-2"
+          >
+            <div className="flex items-baseline justify-between gap-1">
+              <span className="truncate text-xs font-medium text-ink-800">{group.label}</span>
+              <span className="shrink-0 text-[11px] tabular-nums text-ink-500">{group.count} 条</span>
+            </div>
+            <p className="mt-1.5 truncate text-[11px] leading-4 text-ink-500">{group.headline}</p>
+            <div className="mt-1.5">
+              <StatusPill status={group.status} />
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/**
+ * 「规则到底怎么跑的」示意 —— 一条规则从命中到变成一条发现。
+ *
+ * 用真实规则名会让页面像在演示假结果（那是示例数据，容易误导），
+ * 所以这里只呈现**结构**：命中 → 定级 → 附摘录 → 进报告。
+ * 讲机制而不是讲结果，就不需要「示例数据」的免责前提。
+ */
+export function RulePipeline() {
+  const steps = [
+    { title: "命中", detail: "资料正文满足规则条件" },
+    { title: "定级", detail: "严重 / 高 / 中 / 低 / 提示" },
+    { title: "取证据", detail: "所在文件 + 原文摘录" },
+    { title: "进报告", detail: "按严重级别排序呈现" },
+  ];
+
+  return (
+    <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {steps.map((step, index) => (
+        <li key={step.title} className="rounded-md border border-ink-200 bg-white px-3 py-2.5">
+          <div className="flex items-center gap-2">
+            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-brand-600 text-[10px] font-semibold tabular-nums text-white">
+              {index + 1}
+            </span>
+            <span className="text-xs font-medium text-ink-800">{step.title}</span>
+          </div>
+          <p className="mt-1.5 text-[11px] leading-4 text-ink-500">{step.detail}</p>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/**
+ * 资料存取链路图。
+ *
+ * 只画**已实现**的环节 —— 多画一个（比如「加密传输」之外的合规认证）
+ * 就变成没有证据的声明了（docs/DESIGN.md §0 硬规则 2）。
+ */
+export function StorageDiagram() {
+  const nodes = [
+    { title: "浏览器", detail: "携带会话 Cookie" },
+    { title: "服务端鉴权", detail: "回库确认工作区归属" },
+    { title: "私有存储", detail: "无公开 URL，不对外暴露" },
+    { title: "签名临时地址", detail: "取原文件时签发，过期失效" },
+  ];
+
+  return (
+    <div className="rounded-lg border border-ink-200 bg-white p-5">
+      <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {nodes.map((node, index) => (
+          <li key={node.title} className="relative">
+            <div className="rounded-md border border-ink-200 bg-brand-mist px-3 py-2.5">
+              <p className="text-xs font-medium text-ink-800">{node.title}</p>
+              <p className="mt-1 text-[11px] leading-4 text-ink-500">{node.detail}</p>
+            </div>
+            <p className="mt-1 pl-1 text-[10px] tabular-nums text-ink-400">{`环节 ${index + 1} / ${nodes.length}`}</p>
+          </li>
+        ))}
+      </ol>
+      <p className="mt-4 border-t border-ink-100 pt-3 text-[11px] leading-5 text-ink-500">
+        浏览器端传入的工作区编号只作为请求参数，真正的授权判断在服务端完成。
+      </p>
+    </div>
+  );
+}
+
+/**
  * 审核结果面板 —— 首页的核心视觉资产。
  *
  * 数字（14 / 3 / 1）与条目都是**示例**，用来说明"报告长什么样"，
