@@ -28,7 +28,7 @@ export const siteConfig = {
    * 于是界面在向用户报一个我们自己的发布线里根本不存在的版本。
    * 发版时与镜像 tag 一起改（deploy/scripts/build-and-ship.sh 的 IMAGE_TAG）。
    */
-  version: "0.4.15",
+  version: "0.4.16",
   /** 面向搜索引擎的完整描述。 */
   description:
     "供应商资料智能审核系统（SupplierCheck）是面向企业采购、供应链与中小企业的供应商资料审核工具：上传供应商资料包，自动识别文件、提取关键信息，逐条核对资料完整性、证照有效期、统一社会信用代码与主体信息一致性，并生成可逐条追溯的审核报告。",

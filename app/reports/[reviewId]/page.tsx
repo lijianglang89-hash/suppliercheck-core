@@ -189,7 +189,11 @@ export default async function ReportPage({
         ) : (
           grouped.map((group) => (
             <section key={group.category} className="border-b border-ink-200 py-5 last:border-b-0">
-              <h2 className="text-sm font-semibold text-ink-900">
+              {/*
+                打印分页保护，语义见 sample-report 同位置的注释：
+                标题不孤悬页尾（break-after-avoid），单条发现不被拦腰截断（break-inside-avoid）。
+              */}
+              <h2 className="break-after-avoid text-sm font-semibold text-ink-900">
                 {CATEGORY_LABELS[group.category]}
                 <span className="ml-2 text-xs font-normal text-ink-400">
                   {group.items.length} 条
@@ -200,7 +204,7 @@ export default async function ReportPage({
                 {group.items.map((finding, index) => (
                   <li
                     key={finding.id}
-                    className={`border-l-4 pl-4 ${SEVERITY_ACCENT_CLASS[finding.severity]}`}
+                    className={`break-inside-avoid border-l-4 pl-4 ${SEVERITY_ACCENT_CLASS[finding.severity]}`}
                   >
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-xs font-medium text-ink-400">

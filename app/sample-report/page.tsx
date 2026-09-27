@@ -141,7 +141,13 @@ export default function SampleReportPage() {
 
             {grouped.map((group) => (
               <section key={group.category} className="border-b border-ink-200 py-5 last:border-b-0">
-                <h2 className="text-sm font-semibold text-ink-900">
+                {/*
+                  break-after-avoid：分组标题不许孤悬在页尾（标题在上一页末、条目在下一页头）。
+                  break-inside-avoid：一条发现（标题/说明/摘录/建议）不许被分页拦腰截断 ——
+                  B2B 客户会把这份报告打印出来存档，断在半截的条目看起来像报告出了错。
+                  屏幕上没有分页，这两个属性没有任何副作用，所以不包 print: 变体。
+                */}
+                <h2 className="break-after-avoid text-sm font-semibold text-ink-900">
                   {CATEGORY_LABELS[group.category]}
                   <span className="ml-2 text-xs font-normal text-ink-400">
                     {group.items.length} 条
@@ -152,7 +158,7 @@ export default function SampleReportPage() {
                   {group.items.map((finding, index) => (
                     <li
                       key={finding.id}
-                      className={`border-l-4 pl-4 ${SEVERITY_ACCENT_CLASS[finding.severity]}`}
+                      className={`break-inside-avoid border-l-4 pl-4 ${SEVERITY_ACCENT_CLASS[finding.severity]}`}
                     >
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="text-xs font-medium text-ink-400">{index + 1}.</span>

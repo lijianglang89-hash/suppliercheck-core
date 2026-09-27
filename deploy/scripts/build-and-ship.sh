@@ -96,6 +96,17 @@ rm -f /tmp/$(basename "${TARBALL}")
 # 报 "up: command not found"，并在 set -e 下让整个脚本提前退出 ——
 # 远端其实已经全部执行完了，纯属本地副作用。要强调命令一律用「」或普通引号。
 # 讽刺的是，写这条注释时我又在注释里打了一次反引号，于是报错翻倍（第三次才干净）。
+#
+# ⚠️⚠️ 必须把 APP_IMAGE 写进服务器 .env（2026-09-28 事故教训）：
+# 上面那种「APP_IMAGE=x sudo docker compose」只对**这一次**命令生效。
+# 之后任何人（包括我自己的维护脚本）在服务器上跑一次裸的「docker compose up -d」
+# —— 比如轮换数据库口令、改个环境变量 —— compose 就回落到 yml 里的默认 tag，
+# 线上被静默打回旧版本，healthy 照样是绿的。写进 .env 后，裸 up 也拿到正确 tag。
+if grep -q '^APP_IMAGE=' .env; then
+  sed -i "s|^APP_IMAGE=.*|APP_IMAGE=${IMAGE_NAME}:${TAG}|" .env
+else
+  echo "APP_IMAGE=${IMAGE_NAME}:${TAG}" >> .env
+fi
 sudo APP_IMAGE=${IMAGE_NAME}:${TAG} docker compose up -d app
 sleep 10
 # 核对实际生效的镜像与启动时间，别只信 ps 里的 healthy
