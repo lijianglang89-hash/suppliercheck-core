@@ -6,6 +6,7 @@ import { AuthForm } from "@/components/auth/auth-form";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { getCurrentUser } from "@/lib/auth/guards";
+import { resolveSafeRedirect } from "@/lib/auth/redirect";
 import { logger } from "@/lib/logger";
 import { REVIEW_RULES } from "@/lib/reviews/rules";
 import { siteConfig } from "@/lib/site";
@@ -20,10 +21,25 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-export default async function RegisterPage() {
+/**
+ * 注册页同样接受 `?next=`。
+ *
+ * 来源：登录页的「还没有账号？免费体验」会把 next 一路带过来，
+ * 这样从私有链接进来的新用户，注册完能直接回到他原本要看的那一页。
+ * 值一律过 resolveSafeRedirect —— 外部 URL、协议相对 URL 都回落到 /dashboard。
+ */
+export default async function RegisterPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await searchParams;
+  const nextParam = typeof params.next === "string" ? params.next : undefined;
+  const nextPath = resolveSafeRedirect(nextParam);
+
   try {
     const user = await getCurrentUser();
-    if (user) redirect("/dashboard");
+    if (user) redirect(nextPath);
   } catch (error) {
     if (isRedirectError(error)) throw error;
     logger.warn("注册页会话检查失败，降级为展示注册表单", { error: error as Error });
@@ -39,7 +55,7 @@ export default async function RegisterPage() {
         </p>
 
         <div className="mt-8 card p-6">
-          <AuthForm mode="register" action={registerAction} />
+          <AuthForm mode="register" action={registerAction} nextPath={nextParam ? nextPath : undefined} />
         </div>
 
         <p className="mt-6 text-xs leading-5 text-ink-500">

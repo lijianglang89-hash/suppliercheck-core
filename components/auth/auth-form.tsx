@@ -11,7 +11,7 @@ type AuthAction = (state: AuthFormState, formData: FormData) => Promise<AuthForm
 interface AuthFormProps {
   mode: "login" | "register";
   action: AuthAction;
-  /** 登录成功后要跳回的站内路径（注册页不适用）。 */
+  /** 登录 / 注册成功后要跳回的站内路径。两侧都支持，切换模式时必须一路带上。 */
   nextPath?: string;
 }
 
@@ -123,18 +123,29 @@ export function AuthForm({ mode, action, nextPath }: AuthFormProps) {
         {pending ? "提交中…" : isRegister ? "创建账号" : "登录"}
       </button>
 
+      {/*
+        登录 ⇄ 注册的互跳必须把 next 带上。
+        丢了这个参数，从私有链接进来的新用户注册完就落回 /dashboard，
+        他原本想看的那份报告再也回不去 —— 一次本可以避免的转化流失。
+      */}
       <p className="text-center text-sm text-ink-500">
         {isRegister ? (
           <>
             已有账号？{" "}
-            <Link href="/login" className="font-medium text-brand-700 hover:underline">
+            <Link
+              href={nextPath ? `/login?next=${encodeURIComponent(nextPath)}` : "/login"}
+              className="font-medium text-brand-700 hover:underline"
+            >
               去登录
             </Link>
           </>
         ) : (
           <>
             还没有账号？{" "}
-            <Link href="/register" className="font-medium text-brand-700 hover:underline">
+            <Link
+              href={nextPath ? `/register?next=${encodeURIComponent(nextPath)}` : "/register"}
+              className="font-medium text-brand-700 hover:underline"
+            >
               免费体验
             </Link>
           </>

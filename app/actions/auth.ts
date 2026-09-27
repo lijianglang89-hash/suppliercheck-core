@@ -41,6 +41,17 @@ const registerSchema = z.object({
   password: passwordSchema,
   displayName: z.string().trim().min(1, "请填写称呼").max(60),
   workspaceName: z.string().trim().min(1).max(80).optional(),
+  /**
+   * 注册成功后要回跳的站内路径。
+   *
+   * 为什么要支持：未登录用户点开一个私有链接（比如别人分享的报告 /reports/xxx）
+   * 会被 proxy 送到 /login?next=/reports/xxx；他在登录页点「还没有账号？免费体验」
+   * 进注册页 —— 如果 next 在这里断掉，注册完就落回 /dashboard，
+   * 他原本想看的那份报告再也找不回来。转化链路上这是实打实的一次丢失。
+   *
+   * 校验仍然走 resolveSafeRedirect（防 open redirect），不因为「是注册」就放宽。
+   */
+  next: z.string().optional(),
 });
 
 const loginSchema = z.object({
@@ -84,6 +95,7 @@ export async function registerAction(
     password: String(formData.get("password") ?? ""),
     displayName: String(formData.get("displayName") ?? ""),
     workspaceName: String(formData.get("workspaceName") ?? "") || undefined,
+    next: String(formData.get("next") ?? "") || undefined,
   };
 
   const parsed = registerSchema.safeParse(raw);
@@ -91,7 +103,7 @@ export async function registerAction(
     return { fieldErrors: fieldErrorsFrom(parsed.error), email: raw.email };
   }
 
-  const { email, password, displayName, workspaceName } = parsed.data;
+  const { email, password, displayName, workspaceName, next } = parsed.data;
   const db = getDb();
 
   try {
@@ -144,7 +156,7 @@ export async function registerAction(
     return { error: appError.toUserMessage(), email };
   }
 
-  redirect("/dashboard");
+  redirect(resolveSafeRedirect(next));
 }
 
 /* --------------------------------- 登录 --------------------------------- */
