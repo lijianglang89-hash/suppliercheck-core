@@ -162,7 +162,7 @@ export default function HomePage() {
                   font-black 会触发浏览器合成描边加粗，中文笔画会糊成一团。
                   体量靠字号（lg:text-6xl）+ 收紧行高 + 品牌色高亮撑起来。
                 */}
-                <h1 className="mt-5 text-4xl font-bold leading-[1.15] tracking-tight text-ink-900 sm:text-5xl lg:text-[3.75rem]">
+                <h1 className="mt-5 text-4xl font-bold leading-[1.15] tracking-tight text-ink-900 sm:text-5xl lg:text-[3.4rem]">
                   供应商资料审核，
                   <br className="hidden sm:block" />
                   <span className="text-brand-700">不用再逐份翻文件</span>
