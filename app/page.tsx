@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { FloatCard, ReportFragment } from "@/components/landing/visuals";
+import { ReviewWorkspacePreview } from "@/components/landing/visuals";
 import { ContentHubSection } from "@/components/landing/content-hub-section";
 import { ReportSection } from "@/components/landing/report-section";
 import {
   BeforeAfterSection,
+  BoundarySection,
   CapabilitiesSection,
   FinalCtaSection,
   MetricsSection,
@@ -15,8 +16,8 @@ import {
 } from "@/components/landing/sections";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
+import { SAMPLE_REPORT } from "@/lib/content/sample-report";
 import { ALLOWED_MIME_TYPES } from "@/lib/files";
-import { ruleLabel } from "@/lib/reviews/labels";
 import { REVIEW_RULES } from "@/lib/reviews/rules";
 import { getSiteUrl, siteConfig } from "@/lib/site";
 
@@ -56,41 +57,6 @@ const FAQS: ReadonlyArray<{ question: string; answer: string }> = [
     question: "现在可以免费使用吗？",
     answer:
       `可以。当前版本已可跑完整链路：上传 → 解析 → 规则审核 → 报告。审核结论由 ${REVIEW_RULES.length} 条确定性规则产出（可复算、可追溯），不是模型猜测。正式定价尚未公布。`,
-  },
-];
-
-/**
- * 首屏主界面局部的四行发现。
- *
- * 规则名**从真实规则集现算**（`ruleLabel` 查 REVIEW_RULES），改规则名这里跟着变；
- * 文件名与摘录是示例，整块在界面上标注「示例数据」。
- * 刻意不放"完整界面截图"：缩到 600px 后字小到看不清，只剩一个灰方块 ——
- * 取信息密度最高的局部放大，才读得出这个产品到底在干什么。
- */
-const HERO_FRAGMENT = [
-  {
-    rule: ruleLabel("CERTIFICATE_EXPIRED"),
-    status: "fail" as const,
-    file: "ISO9001 证书.pdf",
-    excerpt: "有效期至 2023-04-30 · 已过期",
-  },
-  {
-    rule: ruleLabel("USCC_INVALID"),
-    status: "fail" as const,
-    file: "营业执照.pdf",
-    excerpt: "91330100MA2×××××X7 · 校验位不符",
-  },
-  {
-    rule: ruleLabel("COMPANY_NAME_CONFLICT"),
-    status: "warn" as const,
-    file: "开户资料.pdf",
-    excerpt: "开户主体名称与营业执照不一致",
-  },
-  {
-    rule: ruleLabel("CERTIFICATE_EXPIRING_SOON"),
-    status: "warn" as const,
-    file: "检测报告.pdf",
-    excerpt: "42 天后到期 · 模板阈值 60 天",
   },
 ];
 
@@ -140,17 +106,24 @@ export default function HomePage() {
           Hero：40 / 60 非对称分栏。
 
           左侧只做一件事 —— 用体量压住全场（大字号 + 品牌色高亮 + 主次双 CTA）。
-          右侧不再是一张"完整界面截图"，而是三层：
-            ① 点阵地基（技术感，不靠弥散光）
-            ② 主界面局部：发现清单（信息密度最高的一段，放大到能读清每一列）
-            ③ 两个破形浮层：绝对定位 + 4px 白边 + 2xl 阴影，从主界面上弹出来
-          小屏下浮层退回普通堆叠，绝不让它们在窄屏溢出破版。
+          右侧是一整块**真实审核工作台**：主体 / 状态 / 真实数字 / 发现清单 / 原文摘录。
+
+          ⭐ 这一版的取舍：首屏的主角必须是软件本身，不是装饰。
+          因此删掉了一切"破形浮层"和点阵地基 —— 它们曾经让页面显得精致，
+          但也让产品界面被缩小、被推远。现在右栏 60% 全是界面。
         */}
         <section className="overflow-x-clip border-b border-ink-200 bg-white">
-          <div className="mx-auto w-full max-w-6xl px-6 py-24 lg:py-32">
-            <div className="grid items-center gap-14 lg:grid-cols-5 lg:gap-10">
+          {/*
+            Hero 刻意比下方区块宽一档（max-w-7xl vs 全站 max-w-6xl）：
+            实测过 max-w-6xl 的 40/60 分栏 —— 工作台只有 646px，占视口 44.9%，
+            「UI 太小」的问题并没有真正解决。放宽到 7xl + 5/7 分栏后右栏约 780px，
+            占视口 54%，界面终于成为首屏主角。
+            py 从 32 收到 24：这一屏的留白要让位给界面，不是让位给空气。
+          */}
+          <div className="mx-auto w-full max-w-7xl px-6 py-16 lg:py-24">
+            <div className="grid items-center gap-12 lg:grid-cols-12 lg:gap-10">
               {/* 左：40% */}
-              <div className="lg:col-span-2">
+              <div className="lg:col-span-5">
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-600">
                   {siteConfig.latinName}
                 </p>
@@ -173,9 +146,13 @@ export default function HomePage() {
                   <br className="hidden sm:block" />
                   <span className="text-brand-700">不用再逐份翻文件</span>
                 </h1>
+                {/*
+                  副标题只回答三件事：传什么、系统做什么、最后拿到什么。
+                  「确定性审核规则」这个词不能省 —— 它是本产品与"AI 帮你看看"的分界线。
+                */}
                 <p className="mt-6 text-base leading-7 text-ink-600">
-                  上传营业执照、认证证书、检测报告、报价单等资料，自动发现缺失、过期和信息不一致问题，
-                  输出一份可逐条追溯的审核报告。
+                  上传一份供应商 PDF 或 ZIP 资料包，系统自动展开压缩包、提取正文，
+                  执行 {REVIEW_RULES.length} 条确定性审核规则，把需要关注的问题集中列出来。
                 </p>
 
                 <div className="mt-9 flex flex-wrap items-center gap-3">
@@ -183,7 +160,7 @@ export default function HomePage() {
                     href="/register"
                     className="rounded-md bg-brand-700 px-7 py-3.5 text-base font-medium text-white shadow-sm transition-colors hover:bg-brand-800"
                   >
-                    免费开始审核
+                    开始审核
                   </Link>
                   <a
                     href="#workflow"
@@ -215,60 +192,39 @@ export default function HomePage() {
                 </p>
               </div>
 
-              {/* 右：60% —— 三层悬浮 */}
-              <div className="relative lg:col-span-3">
-                <div aria-hidden="true" className="dot-grid absolute -inset-8 rounded-2xl" />
-
+              {/* 右：60% —— 一整块真实工作台，不再用浮动小卡片当装饰 */}
+              <div className="lg:col-span-7">
                 {/*
-                  pb-16 是给左下浮层留的落位空间。
-                  浮层必须落在**空白处**：实测过 -bottom-10/-left-10 的写法，
-                  它会压住发现清单最后一行（重叠 3477px²）—— 破形是让它跳出容器，
-                  不是让它盖住内容。
-                  ⚠️ 预留高度随浮层高度走：Alert Card 改成三层结构后高度约 70px，
-                  pb-16（64px）已经装不下，实测又压住清单最后一行 3003px² ——
-                  所以这里用 pb-24（96px）。改浮层内容后必须重测重叠面积。
+                  为什么把两个"破形浮层"整个删掉：
+                  它们是装饰，而装饰在这里是负资产 —— 首屏右栏的任务是
+                  「让人 5 秒内看清这个系统长什么样」，任何抢走视线的东西都在削弱它。
+                  同时删掉的还有点阵地基：界面本身的信息密度已经足够，
+                  再多一层纹理只会让它看起来像一张海报。
+
+                  ⭐ 这里的每一条发现都来自 SAMPLE_REPORT —— 与 /sample-report 同一份数据，
+                  且被单测钉死在真实规则上。也就是说首屏不是"画出来的界面"。
                 */}
-                <div className="relative lg:pb-24">
-                  <div className="flex items-baseline justify-between gap-3 pb-2">
-                    <p className="text-sm font-semibold text-ink-900">审核报告</p>
-                    <span className="rounded bg-ink-100 px-2 py-0.5 text-[11px] text-ink-500">
-                      示例数据
-                    </span>
-                  </div>
+                <ReviewWorkspacePreview limit={6} />
 
-                  <ReportFragment rows={HERO_FRAGMENT} />
-
-                  {/* 破形浮层 1：落在主卡下方留出的空白里，向左溢出交界线 */}
-                  <FloatCard
-                    tone="danger"
-                    icon="alert-triangle"
-                    title="证照已过期"
-                    badge="阻断项"
-                    subject="对象：ISO9001 证书"
-                    className="mt-3 lg:absolute lg:bottom-0 lg:-left-6 lg:mt-0"
-                  />
-
-                  {/* 破形浮层 2：向右上溢出到页面留白；上移 80px 避开「审核报告」标题行 */}
-                  <FloatCard
-                    tone="success"
-                    icon="check-circle"
-                    title="校验通过"
-                    badge="通过"
-                    subject="对象：统一社会信用代码 · GB 32100"
-                    className="mt-3 lg:absolute lg:-right-6 lg:-top-20 lg:mt-0"
-                  />
-                </div>
+                <Link
+                  href="/sample-report"
+                  className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-brand-700 hover:text-brand-800"
+                >
+                  查看完整示例报告（{SAMPLE_REPORT.findings.length} 条发现，含证据与建议）
+                  <span aria-hidden="true">→</span>
+                </Link>
               </div>
             </div>
           </div>
         </section>
 
         <MetricsSection />
-        <BeforeAfterSection />
+        <WorkflowSection />
         <ReportSection />
         <CapabilitiesSection />
         <RulesSection />
-        <WorkflowSection />
+        <BoundarySection />
+        <BeforeAfterSection />
         <SecuritySection />
 
         {/* FAQ：用 <details> 折叠，内容仍在 HTML 里，不损害 SEO 与 GEO。 */}

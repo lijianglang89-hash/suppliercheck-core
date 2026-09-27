@@ -44,15 +44,40 @@ export const SAMPLE_REPORT = {
   /** 示例主体。中性名，不指向任何真实企业。 */
   supplierName: "示例科技有限公司",
   templateName: "供应商准入审核",
-  documentCount: 5,
-  readableDocumentCount: 4,
+  /**
+   * 资料包里的实际文件。
+   *
+   * ⭐ 这份清单是**首页与示例报告共用的唯一来源**：落地页的左栏资料列表直接读它，
+   * 不在 landing 组件里另抄一份 —— 抄一份就会漂移，而数字漂移是本项目的头号事故源。
+   *
+   * `state` 是真实文档状态机的值（UPLOADED / PROCESSING / READY / FAILED）。
+   * 注意扫描件是 **READY 而不是 FAILED**：解析本身成功了，只是正文长度为 0
+   * —— 系统如实报「无可提取正文」（规则 DOCUMENT_UNREADABLE），不把解析成功说成失败。
+   */
+  documents: [
+    { name: "营业执照.pdf", ext: "pdf", state: "READY" },
+    { name: "ISO9001 证书.pdf", ext: "pdf", state: "READY" },
+    { name: "ISO14001 证书.pdf", ext: "pdf", state: "READY" },
+    { name: "报价单.xlsx", ext: "xlsx", state: "READY" },
+    { name: "商务条款.docx", ext: "docx", state: "READY" },
+    {
+      name: "开户许可证扫描件.pdf",
+      ext: "pdf",
+      state: "READY",
+      note: "无文字层，未参与核对",
+    },
+  ],
+  /** 资料份数 = documents.length。这两个数字必须与清单、与 findings 引用的文件自洽。 */
+  documentCount: 6,
+  /** 参与核对的份数 = 去掉无正文的扫描件。 */
+  readableDocumentCount: 5,
   totalCharacters: 38_420,
   /** 取自该内置模板的真实配置（BUILTIN_TEMPLATES 里 supplier-onboarding 的 expiryWarningDays）。 */
   expiryWarningDays: 90,
   coverageNotes: [
     "检测报告.pdf 未纳入匹配：资料包中未找到该文件（必备资料缺失）。",
     "开户许可证扫描件.pdf：无可提取正文（疑似扫描件，无文本层），未参与核对。",
-    "其余 4 份资料正文合计 38,420 字符，全部纳入匹配。",
+    "其余 5 份资料正文合计 38,420 字符，全部纳入匹配。",
   ],
   findings: [
     {
@@ -156,6 +181,12 @@ export const SAMPLE_REPORT = {
   baseDate: string;
   supplierName: string;
   templateName: string;
+  documents: {
+    name: string;
+    ext: string;
+    state: "UPLOADED" | "PROCESSING" | "READY" | "FAILED";
+    note?: string;
+  }[];
   documentCount: number;
   readableDocumentCount: number;
   totalCharacters: number;

@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // 工作区目录：临时探针脚本、审阅包的源码片段（可能是被 sed 截断的不完整文件），
+    // 它们不是产品代码，不该让 lint 因为解析失败而红。
+    ".workbuddy/**",
   ]),
 ]);
 

@@ -12,10 +12,18 @@
 
 import Link from "next/link";
 
+import { SAMPLE_REPORT } from "@/lib/content/sample-report";
 import { CATEGORY_LABELS, CATEGORY_ORDER } from "@/lib/reviews/labels";
 import { REVIEW_RULES } from "@/lib/reviews/rules";
-import type { FindingCategory } from "@/lib/reviews/types";
-import { CheckFanout, RulePipeline, StorageDiagram } from "@/components/landing/visuals";
+import { isBlocking, type FindingCategory } from "@/lib/reviews/types";
+import {
+  BoundaryPanel,
+  CheckFanout,
+  FailurePanel,
+  RuleEvidenceFinding,
+  StateStrip,
+  StorageDiagram,
+} from "@/components/landing/visuals";
 import { Icon, type IconName } from "@/components/ui/icons";
 import { Reveal } from "@/components/ui/reveal";
 
@@ -86,9 +94,9 @@ function buildMetrics() {
       icon: "template" as IconName,
     },
     {
-      value: "1",
-      label: "份审核报告",
-      note: "问题清单 + 原文摘录",
+      value: "4",
+      label: "种资料状态",
+      note: "上传 / 解析中 / 可查看 / 失败，全程可见",
       icon: "file-check" as IconName,
     },
   ] as const;
@@ -272,7 +280,7 @@ export function CapabilitiesSection() {
           <Reveal className="relative order-2 lg:order-1" delayMs={120}>
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute -inset-6 rounded-3xl bg-brand-500/12 blur-3xl"
+              className="pointer-events-none absolute -inset-5 rounded-3xl bg-brand-500/10 blur-2xl"
             />
             <div className="relative">
               <CheckFanout
@@ -418,9 +426,15 @@ export function RulesSection() {
           规则清单也是你可以自己关掉的：在审核模板里不勾选的规则不会出现在任何结论里。
         </p>
 
-        {/* 先讲机制的确定性：点按钮之前就知道这条规则什么条件下会报警、会不会替人下结论 */}
+        {/*
+          可追溯性必须落到**实体**上，而不是一句形容词。
+          RULE → EVIDENCE → FINDING 三个节点，客户能在自己那份报告里逐项对上：
+          报告里每条发现都写着规则 id、所在资料、原文摘录。
+          （这一版替换掉了原来的「命中 / 定级 / 取证据 / 进报告」四步链 ——
+           那条链讲的是**流程**，而这里要证明的是**可追溯**，数据链更直接。）
+        */}
         <div className="mt-10">
-          <RulePipeline tone="dark" />
+          <RuleEvidenceFinding dark />
         </div>
 
         <div className="mt-10 grid gap-6 lg:grid-cols-2">
@@ -473,7 +487,7 @@ const WORKFLOW: ReadonlyArray<{
   title: string;
   detail: string;
   icon: IconName;
-  snippet: { kind: "files" | "text" | "rules" | "report"; note: string };
+  snippet: { kind: "files" | "text" | "rules" | "report" | "rerun"; note: string };
 }> = [
   {
     step: "01",
@@ -503,23 +517,41 @@ const WORKFLOW: ReadonlyArray<{
     icon: "file-check",
     snippet: { kind: "report", note: "报告页支持打印 / 另存为 PDF" },
   },
+  {
+    step: "05",
+    title: "修正后重跑",
+    detail: "供应商补齐资料后重新发起审核：结果是整批替换，不会把上一轮的发现留在报告里。",
+    icon: "settings",
+    snippet: { kind: "rerun", note: "重跑 = 用新结果整批替换旧发现" },
+  },
 ];
 
-/** 流程里的小界面片段。刻意抽象，不伪造具体文件名和具体结论。 */
+/**
+ * 流程里的界面片段。
+ *
+ * ⭐ 这一版的唯一改动方向：**放大 + 加密度**。
+ * 上一版这些片段只有 10px 字号、1.5px 高的色条，缩在 60% 栏里等于一张缩略图 ——
+ * 用户看不清，就只会觉得"这是个示意图"。
+ * 现在全部提到可读字号（≥11px），并把状态值换成真实枚举
+ * （READY / FAILED / 严重 / 高），让它读起来像软件而不是插画。
+ *
+ * 仍然不伪造具体文件名与具体结论 —— 抽象的是**内容**，不是**信息密度**。
+ */
 function WorkflowSnippet({ snippet }: { snippet: (typeof WORKFLOW)[number]["snippet"] }) {
   if (snippet.kind === "files") {
     return (
-      <div className="space-y-1">
+      <div className="space-y-1.5">
         {["pdf", "docx", "xlsx", "zip"].map((ext, index) => (
           <div
             key={ext}
-            className="flex items-center gap-2 rounded border border-ink-200 bg-brand-mist px-2 py-1"
-            style={{ opacity: 1 - index * 0.12 }}
+            className="flex items-center gap-2.5 rounded border border-ink-200 bg-brand-mist px-2.5 py-1.5"
+            style={{ opacity: 1 - index * 0.1 }}
           >
-            <span className="inline-flex h-4 w-6 items-center justify-center rounded bg-brand-600/10 text-[9px] font-semibold uppercase text-brand-700">
+            <span className="inline-flex h-5 w-8 items-center justify-center rounded bg-brand-600/10 text-[10px] font-semibold uppercase text-brand-700">
               {ext}
             </span>
-            <span className="h-1.5 flex-1 rounded-full bg-ink-200" />
+            <span className="h-2 flex-1 rounded-full bg-ink-200" />
+            <span className="shrink-0 font-mono text-[10px] text-ink-400">UPLOADED</span>
           </div>
         ))}
       </div>
@@ -528,60 +560,97 @@ function WorkflowSnippet({ snippet }: { snippet: (typeof WORKFLOW)[number]["snip
 
   if (snippet.kind === "text") {
     return (
-      <div className="space-y-1">
-        {[88, 64, 96, 42].map((width, index) => (
-          <div key={index} className="flex items-center gap-1.5">
-            <span
-              className={`h-1.5 rounded-full ${index === 3 ? "bg-warning-600/50" : "bg-ink-200"}`}
-              style={{ width: `${width}%` }}
-            />
+      <div className="space-y-2">
+        {[88, 64, 96].map((width, index) => (
+          <div key={index} className="flex items-center gap-2">
+            <span className="h-2 rounded-full bg-ink-200" style={{ width: `${width}%` }} />
+            <span className="shrink-0 font-mono text-[10px] text-success-600">READY</span>
           </div>
         ))}
-        <p className="pt-0.5 text-[10px] text-ink-400">一份无文字层 → 标为待确认而非跳过</p>
+        <div className="flex items-center gap-2">
+          <span className="h-2 w-[42%] rounded-full bg-warning-600/50" />
+          <span className="shrink-0 font-mono text-[10px] text-warning-600">FAILED</span>
+        </div>
+        <p className="pt-1 text-[11px] leading-5 text-ink-500">
+          无文字层的扫描件 → 标为无可提取正文，不伪造内容
+        </p>
       </div>
     );
   }
 
   if (snippet.kind === "rules") {
+    const rows = [
+      { label: "必备资料缺失", level: "高" },
+      { label: "证照已过期", level: "严重" },
+      { label: "信用代码校验位错误", level: "高" },
+    ];
     return (
-      <div className="space-y-1">
-        {["必备资料缺失", "证照已过期", "信用代码校验位错误"].map((label, index) => (
+      <div className="space-y-1.5">
+        {rows.map((row) => (
           <div
-            key={label}
-            className="flex items-center justify-between gap-2 rounded border border-ink-200 bg-white px-2 py-1"
+            key={row.label}
+            className="flex items-center justify-between gap-2 rounded border border-ink-200 bg-white px-2.5 py-1.5"
           >
-            <span className="truncate text-[10px] text-ink-600">{label}</span>
-            <span
-              className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                index === 0 ? "bg-danger-600" : "bg-warning-600"
-              }`}
-            />
+            <span className="truncate text-[11px] text-ink-700">{row.label}</span>
+            <span className="shrink-0 rounded bg-ink-100 px-1.5 py-0.5 text-[10px] font-medium text-ink-600">
+              {row.level}
+            </span>
           </div>
         ))}
+        <p className="pt-0.5 text-[11px] leading-5 text-ink-500">
+          启用哪几条由模板决定，未启用的规则不出现在任何结论里
+        </p>
+      </div>
+    );
+  }
+
+  if (snippet.kind === "rerun") {
+    return (
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between gap-2 rounded border border-ink-200 bg-ink-50 px-2.5 py-1.5">
+          <span className="text-[11px] text-ink-400 line-through">上一轮 · 4 条发现</span>
+          <span className="shrink-0 font-mono text-[10px] text-ink-400">已作废</span>
+        </div>
+        <div className="flex items-center justify-between gap-2 rounded border border-brand-200 bg-brand-50 px-2.5 py-1.5">
+          <span className="text-[11px] font-medium text-brand-800">本轮 · 2 条发现</span>
+          <span className="shrink-0 font-mono text-[10px] text-brand-700">READY</span>
+        </div>
+        <p className="pt-0.5 text-[11px] leading-5 text-ink-500">
+          整批替换，不是追加 —— 补正后旧发现不会留在报告里
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="rounded border border-ink-200 bg-white p-2">
-      <div className="flex items-center justify-between gap-2 border-b border-ink-100 pb-1.5">
-        <span className="text-[10px] font-medium text-ink-700">审核报告</span>
-        <span className="text-[9px] text-ink-400">打印 / PDF</span>
+    <div className="rounded border border-ink-200 bg-white p-3">
+      <div className="flex items-center justify-between gap-2 border-b border-ink-100 pb-2">
+        <span className="text-[11px] font-medium text-ink-800">审核报告</span>
+        <span className="text-[10px] text-ink-400">打印 / PDF</span>
       </div>
-      <div className="mt-1.5 grid grid-cols-3 gap-1 text-center">
+      <div className="mt-2.5 grid grid-cols-3 gap-1.5 text-center">
         <div>
-          <p className="text-xs font-semibold tabular-nums text-danger-600">3</p>
-          <p className="text-[9px] text-ink-400">问题</p>
+          <p className="text-base font-semibold tabular-nums text-danger-600">
+            {SAMPLE_REPORT.findings.filter((f) => isBlocking(f.severity)).length}
+          </p>
+          <p className="text-[10px] text-ink-500">阻断</p>
         </div>
         <div>
-          <p className="text-xs font-semibold tabular-nums text-warning-600">1</p>
-          <p className="text-[9px] text-ink-400">待确认</p>
+          <p className="text-base font-semibold tabular-nums text-ink-900">
+            {SAMPLE_REPORT.findings.length}
+          </p>
+          <p className="text-[10px] text-ink-500">发现</p>
         </div>
         <div>
-          <p className="text-xs font-semibold tabular-nums text-success-600">14</p>
-          <p className="text-[9px] text-ink-400">通过</p>
+          <p className="text-base font-semibold tabular-nums text-brand-700">
+            {REVIEW_RULES.length}
+          </p>
+          <p className="text-[10px] text-ink-500">规则已执行</p>
         </div>
       </div>
+      <p className="mt-2 border-t border-ink-100 pt-2 text-[11px] leading-5 text-ink-500">
+        每条附所在资料与原文摘录，可回原文逐条核对
+      </p>
     </div>
   );
 }
@@ -608,12 +677,13 @@ export function WorkflowSection() {
             审核流程
           </h2>
           <p className="mt-3 max-w-2xl text-sm leading-7 text-ink-600">
-            四个环节，中间没有需要人工搬运的步骤：上传 → 提取正文 → 逐条核对 → 出报告。
+            五个环节，中间没有需要人工搬运的步骤：
+            上传 → 提取正文 → 规则校验 → 输出报告 → 修正后重跑。
             每一步界面上都能看到它在做什么，以及做不了什么。
           </p>
         </Reveal>
 
-        <ol className="mt-14 space-y-16 lg:space-y-24">
+        <ol className="mt-12 space-y-12 lg:space-y-20">
           {WORKFLOW.map((item, index) => {
             // 偶数拍（02 / 04）把界面片段换到左边，视觉重心左右交替。
             const flip = index % 2 === 1;
@@ -640,18 +710,20 @@ export function WorkflowSection() {
 
                 <Reveal className={flip ? "lg:order-1" : undefined} delayMs={120}>
                   <div className="relative">
-                    {/* 品牌色弥散光：只垫在界面片段后面当环境光，不进文字区 */}
+                    {/*
+                      弥散光从 /12 + blur-3xl 降到 /10 + blur-2xl：
+                      环境光还在，但不再把界面"推远"。这一轮的原则是主角 = 软件本身，
+                      任何让界面看起来像贴在光晕上的装饰都要让位。
+                    */}
                     <div
                       aria-hidden="true"
-                      className="pointer-events-none absolute -inset-6 rounded-3xl bg-brand-500/12 blur-3xl"
+                      className="pointer-events-none absolute -inset-5 rounded-3xl bg-brand-500/10 blur-2xl"
                     />
-                    <div className="card relative p-4 shadow-[0_12px_32px_rgba(23,44,70,0.08)]">
-                      <div className="card-soft p-2.5">
+                    <div className="card relative p-5 shadow-[0_12px_32px_rgba(23,44,70,0.08)]">
+                      <div className="card-soft p-3.5">
                         <WorkflowSnippet snippet={item.snippet} />
                       </div>
-                      <p className="mt-2.5 text-[11px] leading-5 text-ink-500">
-                        {item.snippet.note}
-                      </p>
+                      <p className="mt-3 text-[11px] leading-5 text-ink-500">{item.snippet.note}</p>
                     </div>
                   </div>
                 </Reveal>
@@ -702,6 +774,56 @@ const SECURITY_BOUNDARIES: ReadonlyArray<{ title: string; detail: string; icon: 
     icon: "trash",
   },
 ];
+
+/**
+ * 「诚实边界」区 —— 明确知道什么，也明确知道什么还不能判断。
+ *
+ * 为什么单独占一屏：绝大多数工具只说前半句，
+ * 而采购 / 风控岗位真正要判断的是后半句 —— 系统在哪些地方会保持沉默。
+ * 一个愿意说「这个我判不了」的系统，比一个什么都敢给结论的系统可信。
+ *
+ * 右栏的示例不是编的：`CERTIFICATE_EXPIRY_UNKNOWN` 是 15 条规则里的真实一条，
+ * 正文里只有相对期限（「30 个自然日」）时，它报「有效期无法判定」，**不推算日期**。
+ */
+export function BoundarySection() {
+  return (
+    <section aria-labelledby="boundary-heading" className="border-b border-ink-200 bg-band-alt">
+      <div className="mx-auto w-full max-w-6xl px-6 py-16 lg:py-20">
+        <Reveal>
+          <h2 id="boundary-heading" className="text-2xl font-semibold tracking-tight text-ink-900">
+            明确知道什么，也明确知道什么还不能判断
+          </h2>
+          <p className="mt-3 max-w-2xl text-sm leading-7 text-ink-600">
+            系统只对资料里**实际存在且可解析**的信息下判断。
+            遇到能读但没有可判定日期的表述，它报「无法判定」，而不是替你算一个日期出来 ——
+            推算出来的日期看起来和实测到的一样可信，但它不是实测的。
+          </p>
+        </Reveal>
+
+        <Reveal className="mt-10" delayMs={120}>
+          <BoundaryPanel />
+        </Reveal>
+
+        <Reveal className="mt-10">
+          {/*
+            失败态与状态机放在这一屏的末尾：这一屏讲的是"系统的诚实"，
+            而承认自己会失败，是诚实里最有说服力的一条。
+          */}
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div>
+              <p className="mb-2 text-xs font-medium text-ink-500">资料解析状态机（真实状态值）</p>
+              <StateStrip active="READY" />
+            </div>
+            <div>
+              <p className="mb-2 text-xs font-medium text-ink-500">出错时长这样</p>
+              <FailurePanel />
+            </div>
+          </div>
+        </Reveal>
+      </div>
+    </section>
+  );
+}
 
 export function SecuritySection() {
   return (
@@ -775,13 +897,15 @@ export function FinalCtaSection() {
     <section className="bg-brand-700">
       <div className="mx-auto w-full max-w-6xl px-6 py-16 text-center lg:py-20">
         <h2 className="text-2xl font-semibold tracking-tight text-white lg:text-3xl">
-          开始审核你的下一份供应商资料
+          开始审核第一份供应商资料
         </h2>
         <p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-brand-100">
           {/*
+            CTA 写具体动作，不写「立即联系我们 / 了解更多」这类空号召。
             ⚠️ 这里曾经写「几十秒内就能看到第一份结论」。删掉时间：
             没有实测支撑的耗时是可证伪的承诺，换成一句描述产出物的话，既不夸大也不空。
           */}
+          上传 PDF 或 ZIP，看系统怎么完成解析与规则审核 ——
           注册后选一个内置模板、上传资料包、点「开始审核」，就能拿到第一份逐条可追溯的结论。
         </p>
         {/*
@@ -815,17 +939,18 @@ export function FinalCtaSection() {
             href="/register"
             className="rounded-md bg-white px-6 py-3 text-sm font-medium text-brand-700 hover:bg-brand-50"
           >
-            免费开始审核
+            开始审核
           </Link>
           {/*
             示例报告是转化链路里最靠前的一环：客户不上传资料也能判断"查得准不准"。
             放在主 CTA 旁边而不是塞进导航 —— 犹豫的人需要的是证据，不是更多入口。
+            按钮文案直接写产出物（审核结果示例），不写「了解更多」。
           */}
           <Link
             href="/sample-report"
             className="rounded-md border border-white/40 px-6 py-3 text-sm font-medium text-white hover:bg-white/10"
           >
-            先看一份示例报告
+            查看审核结果示例
           </Link>
         </div>
       </div>

@@ -12,7 +12,10 @@
  * 让它们浮在区块底色之上 —— 扁平贴底的截图看着像插图，不像软件。
  */
 
-import { AlertCard, type AlertTone } from "@/components/ui/alert-card";
+import { SAMPLE_REPORT, type SampleFinding } from "@/lib/content/sample-report";
+import { SEVERITY_BADGE_CLASS, SEVERITY_LABELS } from "@/lib/reviews/labels";
+import { REVIEW_RULES } from "@/lib/reviews/rules";
+import { isBlocking, SEVERITY_RANK, type Severity } from "@/lib/reviews/types";
 import { Icon, type IconName } from "@/components/ui/icons";
 
 type Status = "pass" | "warn" | "fail";
@@ -31,48 +34,6 @@ export function StatusPill({ status }: { status: Status }) {
     >
       {style.label}
     </span>
-  );
-}
-
-/** 文件类型标签：只用文字，不用 emoji，避免出现风格不统一的彩色图标。 */
-function FileIcon({ ext }: { ext: string }) {
-  return (
-    <span className="inline-flex h-6 w-8 shrink-0 items-center justify-center rounded bg-brand-600/10 text-[10px] font-semibold uppercase text-brand-700">
-      {ext}
-    </span>
-  );
-}
-
-export interface DemoFile {
-  name: string;
-  ext: string;
-}
-
-/** 一叠资料文件卡。 */
-export function FileStack({ files }: { files: readonly DemoFile[] }) {
-  return (
-    <ul className="space-y-1.5">
-      {files.map((file) => (
-        <li
-          key={file.name}
-          className="flex items-center gap-2 rounded-md border border-ink-200 bg-white px-2.5 py-2"
-        >
-          <FileIcon ext={file.ext} />
-          <span className="truncate text-xs text-ink-700">{file.name}</span>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-/** 向下箭头：连接"文件 → 审核 → 结果"三段。 */
-export function FlowArrow() {
-  return (
-    <div className="flex justify-center py-1.5 text-ink-300" aria-hidden="true">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-        <path d="M12 5v14M6 13l6 6 6-6" />
-      </svg>
-    </div>
   );
 }
 
@@ -228,121 +189,469 @@ export function StorageDiagram() {
  * 规则名来自真实规则集（调用方从 REVIEW_RULES 传入），摘录是示例 ——
  * 整块仍需标注「示例数据」。
  */
-export function ReportFragment({
-  rows,
+/* ------------------------------------------------------------------ */
+/* 真实产品界面：审核工作台                                            */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 严重级别徽章 —— 直接用报告页那套配色与中文标签，不另起一套。
+ *
+ * 页面上的「严重 / 高 / 中 / 低 / 提示」必须和真实报告里的一模一样，
+ * 否则客户照示例去跑真实资料，措辞对不上就是欺骗。
+ */
+export function SeverityBadge({ severity }: { severity: Severity }) {
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center rounded px-1.5 py-0.5 text-[11px] font-medium ${SEVERITY_BADGE_CLASS[severity]}`}
+    >
+      {SEVERITY_LABELS[severity]}
+    </span>
+  );
+}
+
+/**
+ * 工作台顶部的真实数字条。
+ *
+ * ⭐ 这里**刻意没有「通过 N 项」**。
+ * 本系统只在规则命中时产生发现，不产出「某份资料已通过」的正面结论 ——
+ * 编一个「8 项通过」出来，等于替系统宣布它从不宣布的事情。
+ * 所以四个数字全部是**真实可算**的量：资料数、纳入核对数、正文字符数、已执行规则数。
+ */
+export function WorkspaceMetrics({
+  documentCount,
+  readableDocumentCount,
+  totalCharacters,
+  ruleCount,
+  findingCount,
+  blockingCount,
 }: {
-  rows: readonly { rule: string; status: Status; file: string; excerpt: string }[];
+  documentCount: number;
+  readableDocumentCount: number;
+  totalCharacters: number;
+  ruleCount: number;
+  findingCount: number;
+  blockingCount: number;
+}) {
+  const cells = [
+    { value: documentCount, label: "份资料" },
+    { value: readableDocumentCount, label: "份纳入核对" },
+    { value: totalCharacters.toLocaleString("zh-CN"), label: "字符正文" },
+    { value: ruleCount, label: "条规则已执行" },
+  ];
+
+  return (
+    <div className="border-b border-ink-100 bg-ink-50/60">
+      <dl className="grid grid-cols-2 divide-x divide-ink-100 sm:grid-cols-4">
+        {cells.map((cell) => (
+          <div key={cell.label} className="px-3 py-2">
+            <dt className="text-[10px] leading-4 text-ink-400">{cell.label}</dt>
+            <dd className="text-sm font-semibold tabular-nums text-ink-900">{cell.value}</dd>
+          </div>
+        ))}
+      </dl>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-ink-100 px-3 py-1.5">
+        <span className="text-[11px] text-ink-500">
+          发现 <span className="font-semibold tabular-nums text-ink-900">{findingCount}</span> 条
+        </span>
+        <span aria-hidden="true" className="text-ink-300">
+          ·
+        </span>
+        <span className="text-[11px] text-ink-500">
+          阻断 <span className="font-semibold tabular-nums text-danger-600">{blockingCount}</span>{" "}
+          条（严重 + 高）
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 一条发现：规则 → 严重级别 → 所在资料 → 原文摘录。
+ *
+ * 四列齐全是这个产品的全部说服力所在 ——
+ * 只写「存在风险」谁都会写，附上在哪份资料的哪句话里才算证据。
+ */
+function FindingItem({
+  finding,
+  dense = false,
+}: {
+  finding: SampleFinding;
+  dense?: boolean;
 }) {
   return (
-    <div className="card overflow-hidden p-0">
-      <div className="flex items-center justify-between gap-3 border-b border-ink-100 px-4 py-2.5">
-        <span className="text-xs font-medium text-ink-800">审核报告 · 发现清单</span>
-        <span className="text-[11px] text-ink-400">按严重级别排序</span>
+    <li className="flex items-start gap-2.5 px-3 py-2.5">
+      <SeverityBadge severity={finding.severity} />
+      <div className="min-w-0 flex-1">
+        <p className="text-xs font-medium leading-5 text-ink-900">{finding.title}</p>
+        {!dense && (
+          <p className="mt-0.5 text-[11px] leading-5 text-ink-500">{finding.detail}</p>
+        )}
+        {finding.evidence ? (
+          <p className="mt-1 truncate rounded bg-ink-50 px-1.5 py-0.5 font-mono text-[10px] leading-4 text-ink-600">
+            {finding.evidence}
+          </p>
+        ) : (
+          <p className="mt-1 text-[10px] leading-4 text-ink-400">
+            {finding.documentLabel ? "该资料无文字层，无摘录可附" : "缺失类发现：资料包中没有对应文件"}
+          </p>
+        )}
+      </div>
+      <span className="shrink-0 text-[10px] leading-4 text-ink-400">
+        {finding.documentLabel || "—"}
+      </span>
+    </li>
+  );
+}
+
+/**
+ * 首屏用的审核工作台（纵向密实版）。
+ *
+ * ⭐ 数据源是 `SAMPLE_REPORT` —— 与 `/sample-report` 页面**同一份**，
+ * 且被 `tests/unit/sample-report.test.ts` 钉死在真实规则上
+ * （ruleId 必须存在、类别与严重级别必须等于规则的真实定义）。
+ * 也就是说：首屏展示的不是"画出来的界面"，而是这个引擎真会输出的东西。
+ *
+ * 排序用 `SEVERITY_RANK`，与引擎 `sortFindings` 的第一级一致 ——
+ * 客户在首屏看到的顺序，就是他自己在报告里看到的顺序。
+ */
+export function ReviewWorkspacePreview({ limit = 5 }: { limit?: number }) {
+  const findings = [...SAMPLE_REPORT.findings]
+    .sort((a, b) => SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity])
+    .slice(0, limit);
+
+  const blockingCount = SAMPLE_REPORT.findings.filter((finding) =>
+    isBlocking(finding.severity),
+  ).length;
+
+  return (
+    <div className="overflow-hidden rounded-lg border border-ink-200 bg-white shadow-[0_16px_40px_rgba(23,44,70,0.10)]">
+      {/* 顶部条：主体、模板、状态、判定基准日 —— 真实报告页有同样四样 */}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-ink-100 px-3 py-2.5">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-brand-600/10 text-brand-700">
+            <Icon name="building" className="h-4 w-4" />
+          </span>
+          <span className="truncate text-sm font-semibold text-ink-900">
+            {SAMPLE_REPORT.supplierName}
+          </span>
+          <span className="shrink-0 rounded bg-success-600/10 px-1.5 py-0.5 text-[10px] font-medium text-success-600">
+            审核完成
+          </span>
+        </div>
+        <span className="shrink-0 text-[10px] tabular-nums text-ink-400">
+          {SAMPLE_REPORT.templateName} · 基准日 {SAMPLE_REPORT.baseDate}
+        </span>
       </div>
 
+      <WorkspaceMetrics
+        documentCount={SAMPLE_REPORT.documentCount}
+        readableDocumentCount={SAMPLE_REPORT.readableDocumentCount}
+        totalCharacters={SAMPLE_REPORT.totalCharacters}
+        ruleCount={REVIEW_RULES.length}
+        findingCount={SAMPLE_REPORT.findings.length}
+        blockingCount={blockingCount}
+      />
+
       <ul className="divide-y divide-ink-100">
-        {rows.map((row) => (
-          <li key={row.rule} className="flex items-start gap-3 px-4 py-2.5">
-            <span
-              className={`mt-0.5 h-2 w-2 shrink-0 rounded-full ${
-                row.status === "fail"
-                  ? "bg-danger-600"
-                  : row.status === "warn"
-                    ? "bg-warning-600"
-                    : "bg-success-600"
+        {findings.map((finding) => (
+          <FindingItem key={finding.id} finding={finding} dense />
+        ))}
+      </ul>
+
+      <div className="flex items-center justify-between gap-2 border-t border-ink-100 bg-ink-50/60 px-3 py-2">
+        <span className="text-[10px] leading-4 text-ink-400">
+          示例数据 · 与「查看示例报告」看到的是同一份
+        </span>
+        <span className="shrink-0 text-[10px] tabular-nums text-ink-400">
+          {findings.length} / {SAMPLE_REPORT.findings.length} 条
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/** 资料解析状态：真实状态机的四个值，一个不多一个不少。 */
+const DOC_STATES = ["UPLOADED", "PROCESSING", "READY", "FAILED"] as const;
+type DocState = (typeof DOC_STATES)[number];
+
+const DOC_STATE_STYLE: Record<DocState, string> = {
+  UPLOADED: "bg-ink-100 text-ink-500",
+  PROCESSING: "bg-brand-50 text-brand-700",
+  READY: "bg-success-600/10 text-success-600",
+  FAILED: "bg-danger-600/10 text-danger-600",
+};
+
+function DocStatePill({ state }: { state: DocState }) {
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center rounded px-1.5 py-0.5 font-mono text-[10px] font-medium ${DOC_STATE_STYLE[state]}`}
+    >
+      {state}
+    </span>
+  );
+}
+
+/**
+ * 资料清单 + 解析状态（工作台左栏）。
+ *
+ * 状态值用的是**真实枚举**（UPLOADED / PROCESSING / READY / FAILED），
+ * 不写「已解析 / 已完成」这类自己造的词 —— 客户在界面上看到的就是这四个英文值。
+ */
+export function DocumentPane({
+  files,
+}: {
+  files: readonly { name: string; ext: string; state: DocState }[];
+}) {
+  return (
+    <div className="flex h-full flex-col rounded-lg border border-ink-200 bg-white">
+      <div className="flex items-center justify-between gap-2 border-b border-ink-100 px-3 py-2">
+        <span className="text-xs font-semibold text-ink-900">供应商资料</span>
+        <span className="text-[10px] tabular-nums text-ink-400">{files.length} 份</span>
+      </div>
+      <ul className="flex-1 divide-y divide-ink-100">
+        {files.map((file) => (
+          <li key={file.name} className="flex items-center gap-2 px-3 py-2">
+            <span className="inline-flex h-5 w-7 shrink-0 items-center justify-center rounded bg-brand-600/10 text-[9px] font-semibold uppercase text-brand-700">
+              {file.ext}
+            </span>
+            <span className="min-w-0 flex-1 truncate text-xs text-ink-700">{file.name}</span>
+            <DocStatePill state={file.state} />
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/**
+ * 审核结果（工作台右栏）—— 按严重级别排序，与真实报告页一致。
+ *
+ * 分组标题用的是真实中文级别名（严重 / 高 / 中 / 低 / 提示），
+ * 不是「CRITICAL / HIGH」生硬堆砌 —— 但级别徽章保留英文枚举的对应关系，
+ * 因为客户在自己那份报告里看到的就是这套词。
+ */
+export function FindingsPane({ findings }: { findings: readonly SampleFinding[] }) {
+  const sorted = [...findings].sort(
+    (a, b) => SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity],
+  );
+
+  return (
+    <div className="flex h-full flex-col rounded-lg border border-ink-200 bg-white">
+      <div className="flex items-center justify-between gap-2 border-b border-ink-100 px-3 py-2">
+        <span className="text-xs font-semibold text-ink-900">审核结果</span>
+        <span className="text-[10px] text-ink-400">按严重级别排序</span>
+      </div>
+      <ul className="flex-1 divide-y divide-ink-100">
+        {sorted.map((finding) => (
+          <FindingItem key={finding.id} finding={finding} />
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* 状态机与失败态                                                      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 四个真实状态横排 —— 让「出错以后怎么办」在页面上有一个答案。
+ *
+ * 为什么要把 FAILED 摆出来：只展示成功路径的落地页，
+ * 等于默认告诉客户「这系统不会失败」，而任何一个真实系统都会失败。
+ * 敢把失败态放在首页，是"这是个真东西"的最强信号之一。
+ */
+export function StateStrip({ active = "READY" }: { active?: DocState }) {
+  return (
+    <div className="rounded-lg border border-ink-200 bg-white p-3">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {DOC_STATES.map((state, index) => {
+          const isActive = state === active;
+          return (
+            <div
+              key={state}
+              className={`rounded-md border px-2 py-1.5 ${
+                isActive ? "border-brand-300 bg-brand-50" : "border-ink-200 bg-ink-50/60"
               }`}
-              aria-hidden="true"
-            />
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-x-2">
-                <span className="text-xs font-medium text-ink-800">{row.rule}</span>
-                <span className="text-[11px] text-ink-400">{row.file}</span>
+            >
+              <div className="flex items-center justify-between gap-1.5">
+                <span className="font-mono text-[10px] font-semibold text-ink-700">{state}</span>
+                {index < DOC_STATES.length - 1 && (
+                  <span aria-hidden="true" className="hidden text-[10px] text-ink-300 sm:block">
+                    →
+                  </span>
+                )}
               </div>
-              <p className="mt-0.5 truncate font-mono text-[11px] leading-5 text-ink-500">
-                {row.excerpt}
-              </p>
             </div>
-            <StatusPill status={row.status} />
-          </li>
-        ))}
-      </ul>
+          );
+        })}
+      </div>
     </div>
   );
 }
 
 /**
- * 破形浮层：从主界面上"弹"出来的小卡片。
+ * 失败态卡片。
  *
- * 4px 白边 + 2xl 阴影是刻意的 —— 白边让它和底下的界面彻底分离，
- * 重阴影提供 Z 轴高度。小屏下不做绝对定位（会溢出破版），改为堆叠在主卡下方。
- *
- * 内容一律交给 AlertCard：状态 / 定性 / 对象三层分开排，
- * 不再把「证照已过期 ISO9001 证书 · 阻断项」挤成一行 ——
- * 一行平铺的负面信息看着就是一块补丁，读者还得自己拆句子。
+ * 场景取自真实测试：`tests/integration/archive-expansion.test.ts` 里
+ * 一个含 .exe 的压缩包会被拒绝 —— 「压缩包包含不允许的文件类型」是系统真会说的话，
+ * 不是为了让页面好看编出来的错误示例。
  */
-export function FloatCard({
-  tone,
-  icon,
-  title,
-  badge,
-  subject,
-  className = "",
-}: {
-  tone: AlertTone;
-  icon: IconName;
-  title: string;
-  badge?: string;
-  subject?: string;
-  className?: string;
-}) {
+export function FailurePanel() {
   return (
-    <div className={`w-64 rounded-md border-4 border-white bg-white shadow-2xl ${className}`}>
-      <AlertCard tone={tone} icon={icon} title={title} badge={badge} subject={subject} />
-    </div>
-  );
-}
-
-/**
- * 审核结果面板 —— 首页的核心视觉资产。
- *
- * 数字（14 / 3 / 1）与条目都是**示例**，用来说明"报告长什么样"，
- * 不代表任何真实审核结果。调用方必须标注「示例数据」。
- */
-export function ResultPanel({
-  summary,
-  rows,
-}: {
-  summary: { pass: number; warn: number; fail: number };
-  rows: readonly { label: string; status: Status; note: string }[];
-}) {
-  return (
-    <div className="card overflow-hidden">
-      <div className="grid grid-cols-3 divide-x divide-ink-200 border-b border-ink-200">
-        <div className="px-3 py-2.5 text-center">
-          <p className="text-lg font-semibold tabular-nums text-success-600">{summary.pass}</p>
-          <p className="text-[11px] text-ink-500">通过</p>
-        </div>
-        <div className="px-3 py-2.5 text-center">
-          <p className="text-lg font-semibold tabular-nums text-warning-600">{summary.warn}</p>
-          <p className="text-[11px] text-ink-500">待确认</p>
-        </div>
-        <div className="px-3 py-2.5 text-center">
-          <p className="text-lg font-semibold tabular-nums text-danger-600">{summary.fail}</p>
-          <p className="text-[11px] text-ink-500">问题</p>
-        </div>
+    <div className="rounded-lg border border-danger-600/25 bg-white">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-danger-600/15 bg-danger-600/5 px-3 py-2">
+        <span className="flex items-center gap-2">
+          <span className="text-danger-600" aria-hidden="true">
+            <Icon name="alert-triangle" className="h-4 w-4" />
+          </span>
+          <span className="font-mono text-[11px] font-semibold text-danger-600">FAILED</span>
+          <span className="text-xs font-medium text-ink-900">供应商资料包解析失败</span>
+        </span>
+        <span className="text-[10px] tabular-nums text-ink-400">作业已记录原因</span>
       </div>
 
-      <ul className="divide-y divide-ink-100">
-        {rows.map((row) => (
-          <li key={row.label} className="flex items-center justify-between gap-3 px-3 py-2">
-            <div className="min-w-0">
-              <p className="truncate text-xs font-medium text-ink-800">{row.label}</p>
-              <p className="truncate text-[11px] text-ink-500">{row.note}</p>
-            </div>
-            <StatusPill status={row.status} />
-          </li>
-        ))}
-      </ul>
+      <dl className="divide-y divide-ink-100">
+        <div className="flex gap-3 px-3 py-2">
+          <dt className="shrink-0 text-[11px] text-ink-400">原因</dt>
+          <dd className="text-xs leading-5 text-ink-700">压缩包包含不允许的文件类型</dd>
+        </div>
+        <div className="flex gap-3 px-3 py-2">
+          <dt className="shrink-0 text-[11px] text-ink-400">系统行为</dt>
+          <dd className="text-xs leading-5 text-ink-700">
+            父文档被标记为 FAILED 并记录原因，已展开出的资料保留可用
+          </dd>
+        </div>
+      </dl>
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* 边界与可追溯性                                                      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 「能确定什么 / 不能确定什么」对照板。
+ *
+ * 这一块是本页**可信度**的核心：绝大多数工具只说前半句，
+ * 而采购/风控岗位真正要判断的是后半句 —— 系统在哪些地方会保持沉默。
+ *
+ * 右栏的示例是真实规则 `CERTIFICATE_EXPIRY_UNKNOWN` 的真实行为：
+ * 正文里写「报价有效期：30 个自然日」但没有可解析的截止日时，
+ * 系统报 LOW「有效期无法判定」，**不做推算**。
+ */
+export function BoundaryPanel() {
+  const canDetermine = [
+    "已识别出的统一社会信用代码及其校验位",
+    "已解析到的证书有效期截止日",
+    "资料包中实际存在的文件",
+    "规则命中与否（同一份资料两次结果一致）",
+  ];
+  const cannotDetermine = [
+    {
+      quote: "报价有效期：30 个自然日",
+      reason: "只有相对期限，没有起始日与截止日",
+      ruleId: "CERTIFICATE_EXPIRY_UNKNOWN",
+    },
+  ];
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      <div className="rounded-lg border border-ink-200 bg-white p-4">
+        <div className="flex items-center gap-2">
+          <span className="flex h-6 w-6 items-center justify-center rounded bg-success-600/10 text-success-600">
+            <Icon name="check" className="h-3.5 w-3.5" />
+          </span>
+          <h3 className="text-sm font-semibold text-ink-900">可以确定</h3>
+        </div>
+        <ul className="mt-3 space-y-2">
+          {canDetermine.map((item) => (
+            <li key={item} className="flex gap-2 text-xs leading-6 text-ink-700">
+              <span aria-hidden="true" className="text-success-600">
+                ✓
+              </span>
+              {item}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="rounded-lg border border-warning-600/25 bg-white p-4">
+        <div className="flex items-center gap-2">
+          <span className="flex h-6 w-6 items-center justify-center rounded bg-warning-600/10 text-warning-600">
+            <Icon name="alert-triangle" className="h-3.5 w-3.5" />
+          </span>
+          <h3 className="text-sm font-semibold text-ink-900">无法判定（不会猜）</h3>
+        </div>
+        <ul className="mt-3 space-y-3">
+          {cannotDetermine.map((item) => (
+            <li key={item.ruleId}>
+              <p className="rounded bg-ink-50 px-2 py-1 font-mono text-[11px] leading-5 text-ink-700">
+                {item.quote}
+              </p>
+              <p className="mt-1.5 text-xs leading-6 text-ink-600">{item.reason}</p>
+              <p className="mt-1 flex items-center gap-1.5">
+                <span className="rounded bg-ink-100 px-1.5 py-0.5 font-mono text-[10px] text-ink-600">
+                  {item.ruleId}
+                </span>
+                <span className="text-[10px] text-ink-400">报「有效期无法判定」，不推算日期</span>
+              </p>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * RULE → EVIDENCE → FINDING 三节点。
+ *
+ * 「可追溯」如果只写成一句形容词，客户无从验证；
+ * 把链条的三个实体摆出来，他就能在自己那份报告里逐项对上。
+ */
+export function RuleEvidenceFinding({ dark = false }: { dark?: boolean }) {
+  const nodes = [
+    { tag: "RULE", title: "规则", detail: "15 条规则，启用哪几条由模板决定" },
+    { tag: "EVIDENCE", title: "证据", detail: "所在资料 + 原文摘录，缺失类发现没有摘录" },
+    { tag: "FINDING", title: "发现", detail: "严重级别 + 判据 + 建议，按级别排序" },
+  ];
+
+  return (
+    <ol className="grid gap-3 sm:grid-cols-3">
+      {nodes.map((node, index) => (
+        <li
+          key={node.tag}
+          className={`relative rounded-lg border px-3 py-2.5 ${
+            dark ? "border-white/10 bg-white/5" : "border-ink-200 bg-white"
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <span
+              className={`rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold ${
+                dark ? "bg-white/15 text-white" : "bg-brand-600/10 text-brand-700"
+              }`}
+            >
+              {node.tag}
+            </span>
+            <span className={`text-xs font-semibold ${dark ? "text-white" : "text-ink-900"}`}>
+              {node.title}
+            </span>
+            {index < nodes.length - 1 && (
+              <span
+                aria-hidden="true"
+                className={`ml-auto hidden text-[11px] sm:block ${dark ? "text-white/40" : "text-ink-300"}`}
+              >
+                →
+              </span>
+            )}
+          </div>
+          <p className={`mt-1.5 text-[11px] leading-5 ${dark ? "text-white/60" : "text-ink-500"}`}>
+            {node.detail}
+          </p>
+        </li>
+      ))}
+    </ol>
   );
 }

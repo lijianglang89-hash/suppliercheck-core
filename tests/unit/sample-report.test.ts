@@ -71,4 +71,29 @@ describe("示例报告与真实规则一致", () => {
   it("示例主体是中性名，不指向真实企业", () => {
     expect(SAMPLE_REPORT.supplierName).toContain("示例");
   });
+
+  /**
+   * 这三个数字会被**首页首屏**直接渲染（ReviewWorkspacePreview 的数字条），
+   * 因此它们的不自洽不再是"示例页的小瑕疵"，而是首页在说一个可验证的错数字。
+   *
+   * 起因：落地页要放大展示资料清单时才发现，documentCount 写的是 5，
+   * 而 findings 里实际引用了 6 份文件 —— 手抄的数字迟早和真实内容分家。
+   * 现在清单是唯一来源，这三个断言把三者钉在一起。
+   */
+  it("资料份数与清单、与发现引用的文件自洽", () => {
+    expect(SAMPLE_REPORT.documentCount).toBe(SAMPLE_REPORT.documents.length);
+    expect(SAMPLE_REPORT.readableDocumentCount).toBe(
+      SAMPLE_REPORT.documents.filter((document) => !document.note).length,
+    );
+    expect(SAMPLE_REPORT.readableDocumentCount).toBeLessThan(SAMPLE_REPORT.documentCount);
+
+    // findings 里出现的每一个文件名，都必须在资料清单里找得到（缺失类发现除外）。
+    const known = new Set(SAMPLE_REPORT.documents.map((document) => document.name));
+    for (const finding of SAMPLE_REPORT.findings) {
+      if (!finding.documentLabel) continue; // 缺失类发现没有来源文件
+      for (const name of finding.documentLabel.split(" / ")) {
+        expect(known.has(name), `发现引用了资料包里不存在的文件：${name}`).toBe(true);
+      }
+    }
+  });
 });
