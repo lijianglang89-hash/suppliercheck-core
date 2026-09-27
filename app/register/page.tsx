@@ -7,6 +7,8 @@ import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { getCurrentUser } from "@/lib/auth/guards";
 import { logger } from "@/lib/logger";
+import { REVIEW_RULES } from "@/lib/reviews/rules";
+import { siteConfig } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "免费体验",
@@ -41,7 +43,8 @@ export default async function RegisterPage() {
         </div>
 
         <p className="mt-6 text-xs leading-5 text-ink-500">
-          当前为 V0.3：上传资料后即可发起审核，结论由 15 条确定性规则产出，可逐条追溯。
+          当前为 V{siteConfig.version}：上传资料后即可发起审核，结论由 {REVIEW_RULES.length}{" "}
+          条确定性规则产出，可逐条追溯。
         </p>
       </main>
       <SiteFooter />

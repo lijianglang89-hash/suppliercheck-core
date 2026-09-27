@@ -9,9 +9,10 @@
  * 刻意不用 backdrop-blur：白底上没有可模糊的东西，写了也看不出来。
  */
 
-import { FileStack, FlowArrow, ResultPanel } from "@/components/landing/visuals";
+import { FileStack, FloatCard, FlowArrow, ResultPanel } from "@/components/landing/visuals";
 import { Icon } from "@/components/ui/icons";
 import { Reveal } from "@/components/ui/reveal";
+import { REVIEW_RULES } from "@/lib/reviews/rules";
 
 const DEMO_FILES = [
   { name: "营业执照", ext: "pdf" },
@@ -100,7 +101,9 @@ export function ReportSection() {
               </div>
 
               <FlowArrow />
-              <p className="mb-2 text-center text-[11px] text-ink-400">15 条规则逐条核对</p>
+              <p className="mb-2 text-center text-[11px] text-ink-400">
+                {REVIEW_RULES.length} 条规则逐条核对
+              </p>
 
               <ResultPanel summary={{ pass: 14, warn: 3, fail: 1 }} rows={DEMO_ROWS} />
 
@@ -109,21 +112,14 @@ export function ReportSection() {
               </p>
             </div>
 
-            {/* 破形小浮层：向右下溢出的状态标签，与首屏同语言 */}
-            <div className="card relative mt-3 flex w-64 items-start gap-2 border-4 border-white p-3 shadow-xl lg:absolute lg:-bottom-8 lg:-right-6 lg:mt-0">
-              <span
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-red-50 text-danger-600"
-                aria-hidden="true"
-              >
-                <Icon name="alert-triangle" className="h-3.5 w-3.5" />
-              </span>
-              <span>
-                <span className="block text-xs font-semibold text-ink-900">阻断项 1 条</span>
-                <span className="mt-0.5 block text-[11px] leading-4 text-ink-500">
-                  建议先让供应商补正资料
-                </span>
-              </span>
-            </div>
+            {/* 破形小浮层：向右下溢出的状态标签，与首屏同语言（Alert Card 三层结构） */}
+            <FloatCard
+              tone="danger"
+              icon="alert-triangle"
+              title="阻断项 1 条"
+              subject="建议先让供应商补正资料"
+              className="mt-3 lg:absolute lg:-bottom-8 lg:-right-6 lg:mt-0"
+            />
           </Reveal>
         </div>
       </div>

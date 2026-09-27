@@ -586,40 +586,78 @@ function WorkflowSnippet({ snippet }: { snippet: (typeof WORKFLOW)[number]["snip
   );
 }
 
+/**
+ * 审核流程 —— Z 字交替的四拍。
+ *
+ * 为什么从「四列平铺」改成左右交替：平铺的每一格都长得一样，视线一路滑到底
+ * 什么也没记住；交替之后每一拍都要换边，眼睛被迫重新定位 —— 这就是节奏。
+ *
+ * ⚠️ **DOM 顺序始终是「文案在前、界面在后」**，视觉上的左右互换只靠
+ * `lg:order-*`：屏幕阅读器与爬虫读到的顺序仍是 01→04，
+ * 否则「环节 2 的图出现在环节 1 的文之前」会让人读错流程顺序。
+ *
+ * 右侧（或偶数拍的左侧）放的是该产品在这一步**真实的界面片段**
+ * ——不是示意图，是从 app 里同一套视觉语言搬过来的小组件。
+ */
 export function WorkflowSection() {
   return (
     <section aria-labelledby="workflow-heading" className="border-b border-ink-200 bg-white">
-      <div className="mx-auto w-full max-w-6xl px-6 py-16 lg:py-20">
-        <h2 id="workflow-heading" className="text-2xl font-semibold tracking-tight text-ink-900">
-          审核流程
-        </h2>
-        <ol className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4 lg:gap-0">
-          {WORKFLOW.map((item, index) => (
-            <li key={item.step} className="relative lg:px-5 lg:first:pl-0 lg:last:pr-0">
-              {index > 0 ? (
-                <span
-                  aria-hidden="true"
-                  className="absolute left-0 top-4 hidden h-px w-5 bg-ink-300 lg:block"
-                />
-              ) : null}
-              <span className="flex items-center gap-2">
-                <span
-                  className="flex h-8 w-8 items-center justify-center rounded-md bg-brand-600 text-white"
-                  aria-hidden="true"
-                >
-                  <Icon name={item.icon} className="h-4 w-4" />
-                </span>
-                <span className="text-xs font-semibold tabular-nums text-ink-400">{item.step}</span>
-              </span>
-              <h3 className="mt-3 text-base font-semibold text-ink-900">{item.title}</h3>
-              <p className="mt-2 text-sm leading-6 text-ink-600">{item.detail}</p>
+      <div className="mx-auto w-full max-w-6xl px-6 py-16 lg:py-24">
+        <Reveal>
+          <h2 id="workflow-heading" className="text-2xl font-semibold tracking-tight text-ink-900">
+            审核流程
+          </h2>
+          <p className="mt-3 max-w-2xl text-sm leading-7 text-ink-600">
+            四个环节，中间没有需要人工搬运的步骤：上传 → 提取正文 → 逐条核对 → 出报告。
+            每一步界面上都能看到它在做什么，以及做不了什么。
+          </p>
+        </Reveal>
 
-              <div className="card-soft mt-3 p-2.5">
-                <WorkflowSnippet snippet={item.snippet} />
-              </div>
-              <p className="mt-2 text-[11px] leading-5 text-ink-500">{item.snippet.note}</p>
-            </li>
-          ))}
+        <ol className="mt-14 space-y-16 lg:space-y-24">
+          {WORKFLOW.map((item, index) => {
+            // 偶数拍（02 / 04）把界面片段换到左边，视觉重心左右交替。
+            const flip = index % 2 === 1;
+            return (
+              <li key={item.step} className="grid items-center gap-8 lg:grid-cols-2 lg:gap-16">
+                <Reveal className={flip ? "lg:order-2" : undefined}>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="flex h-9 w-9 items-center justify-center rounded-md bg-brand-600 text-white"
+                      aria-hidden="true"
+                    >
+                      <Icon name={item.icon} className="h-4 w-4" />
+                    </span>
+                    <span className="text-xs font-semibold tabular-nums text-ink-400">
+                      环节 {item.step} / 0{WORKFLOW.length}
+                    </span>
+                  </div>
+
+                  <h3 className="mt-4 text-[clamp(1.25rem,2.2vw,1.75rem)] font-semibold leading-snug tracking-tight text-ink-900">
+                    {item.title}
+                  </h3>
+                  <p className="mt-3 text-sm leading-7 text-ink-600">{item.detail}</p>
+                </Reveal>
+
+                <Reveal className={flip ? "lg:order-1" : undefined} delayMs={120}>
+                  <div className="relative">
+                    {/* 品牌色弥散光：只垫在界面片段后面当环境光，不进文字区 */}
+                    <div
+                      aria-hidden="true"
+                      className="pointer-events-none absolute -inset-6 rounded-3xl bg-brand-500/12 blur-3xl"
+                    />
+                    <div className="card relative p-4 shadow-[0_12px_32px_rgba(23,44,70,0.08)]">
+                      <div className="card-soft p-2.5">
+                        <WorkflowSnippet snippet={item.snippet} />
+                      </div>
+                      <p className="mt-2.5 text-[11px] leading-5 text-ink-500">
+                        {item.snippet.note}
+                      </p>
+                    </div>
+                  </div>
+                </Reveal>
+              </li>
+            );
+          })}
         </ol>
       </div>
     </section>
@@ -641,38 +679,92 @@ const SECURITY_ITEMS: ReadonlyArray<{ title: string; detail: string; icon: IconN
   { title: "签名访问", detail: "查看原始文件需要带签名的临时地址，过期失效。", icon: "clock" },
 ];
 
+/**
+ * 「系统做不到什么」—— 与安全机制同等重要，且必须放在同一屏里。
+ *
+ * 只写安全机制、不写边界，读起来就是一份自我表扬清单；
+ * 客户真正想知道的恰恰是那些"没有"的部分（有没有认证、会不会拿去训练、删了还在不在）。
+ */
+const SECURITY_BOUNDARIES: ReadonlyArray<{ title: string; detail: string; icon: IconName }> = [
+  {
+    title: "未取得任何第三方安全认证",
+    detail: "上列机制均为系统内已实现的行为，不构成认证声明。",
+    icon: "shield",
+  },
+  {
+    title: "资料不用于模型训练",
+    detail: "当前未接入真实模型调用，AI 复核未启用（开发模拟 Provider）。",
+    icon: "lock",
+  },
+  {
+    title: "删除是软删除",
+    detail: "删除后不再出现在列表中；服务端保留删除标记以便追溯，不是物理清除。",
+    icon: "trash",
+  },
+];
+
 export function SecuritySection() {
   return (
     <section aria-labelledby="security-heading" className="border-b border-ink-200 bg-band">
-      <div className="mx-auto w-full max-w-6xl px-6 py-16 lg:py-20">
-        <h2 id="security-heading" className="text-2xl font-semibold tracking-tight text-ink-900">
-          资料怎么被保管
-        </h2>
-        {/* 先给链路图，再给文字条目 —— 图让人一眼看懂边界在哪，条目负责说清每一环 */}
-        <div className="mt-10">
-          <StorageDiagram />
-        </div>
+      <div className="mx-auto w-full max-w-6xl px-6 py-16 lg:py-24">
+        <Reveal>
+          <h2 id="security-heading" className="text-2xl font-semibold tracking-tight text-ink-900">
+            资料怎么被保管
+          </h2>
+          {/* 先给链路图，再给文字条目 —— 图让人一眼看懂边界在哪，条目负责说清每一环 */}
+          <div className="mt-10">
+            <StorageDiagram />
+          </div>
+        </Reveal>
 
-        {/* 只陈述已实现的机制。未取得认证就不写认证 —— 见 docs/DESIGN.md §0 硬规则 2 */}
-        <ul className="mt-8 grid gap-6 sm:grid-cols-2">
-          {SECURITY_ITEMS.map((item) => (
-            <li key={item.title} className="card flex gap-3 p-4">
-              <span
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-700"
-                aria-hidden="true"
-              >
-                <Icon name={item.icon} className="h-4 w-4" />
-              </span>
-              <div>
-                <h3 className="text-base font-semibold text-ink-900">{item.title}</h3>
-                <p className="mt-1 text-sm leading-6 text-ink-600">{item.detail}</p>
-              </div>
-            </li>
-          ))}
-        </ul>
-        <p className="mt-8 text-xs leading-5 text-ink-500">
-          本项目未取得任何第三方安全认证，上列均为系统内已实现的机制，不构成认证声明。
-        </p>
+        {/*
+          Z 字错位：左边一块深色「边界声明」，右边四张浅色「已实现机制」卡片。
+          深/浅的空间跳跃让这一屏在整页节奏里重新起一拍 ——
+          更重要的是，把"做到了什么"和"没做到什么"并排放，读者一眼能对齐。
+        */}
+        <div className="mt-12 grid gap-6 lg:grid-cols-5 lg:gap-8">
+          <Reveal className="lg:col-span-2">
+            <div className="h-full rounded-2xl bg-brand-900 p-6 text-white lg:p-7">
+              <h3 className="text-base font-semibold text-white">先说清楚没做到的</h3>
+              <ul className="mt-5 space-y-5">
+                {SECURITY_BOUNDARIES.map((item) => (
+                  <li key={item.title} className="flex gap-3">
+                    <span
+                      className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10 text-brand-100"
+                      aria-hidden="true"
+                    >
+                      <Icon name={item.icon} className="h-4 w-4" />
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold text-white">{item.title}</p>
+                      <p className="mt-1 text-xs leading-6 text-white/70">{item.detail}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </Reveal>
+
+          {/* 只陈述已实现的机制。未取得认证就不写认证 —— 见 docs/DESIGN.md §0 硬规则 2 */}
+          <Reveal className="lg:col-span-3" delayMs={120}>
+            <ul className="grid h-full gap-4 sm:grid-cols-2">
+              {SECURITY_ITEMS.map((item) => (
+                <li key={item.title} className="card flex gap-3 p-4">
+                  <span
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-700"
+                    aria-hidden="true"
+                  >
+                    <Icon name={item.icon} className="h-4 w-4" />
+                  </span>
+                  <div>
+                    <h3 className="text-base font-semibold text-ink-900">{item.title}</h3>
+                    <p className="mt-1 text-sm leading-6 text-ink-600">{item.detail}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </Reveal>
+        </div>
       </div>
     </section>
   );
@@ -686,7 +778,11 @@ export function FinalCtaSection() {
           开始审核你的下一份供应商资料
         </h2>
         <p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-brand-100">
-          注册后选一个内置模板、上传资料包、点「开始审核」，几十秒内就能看到第一份结论。
+          {/*
+            ⚠️ 这里曾经写「几十秒内就能看到第一份结论」。删掉时间：
+            没有实测支撑的耗时是可证伪的承诺，换成一句描述产出物的话，既不夸大也不空。
+          */}
+          注册后选一个内置模板、上传资料包、点「开始审核」，就能拿到第一份逐条可追溯的结论。
         </p>
         {/*
           把"接下来会发生什么"写清楚，代替空泛的号召。
@@ -721,12 +817,16 @@ export function FinalCtaSection() {
           >
             免费开始审核
           </Link>
-          <a
-            href="#workflow"
+          {/*
+            示例报告是转化链路里最靠前的一环：客户不上传资料也能判断"查得准不准"。
+            放在主 CTA 旁边而不是塞进导航 —— 犹豫的人需要的是证据，不是更多入口。
+          */}
+          <Link
+            href="/sample-report"
             className="rounded-md border border-white/40 px-6 py-3 text-sm font-medium text-white hover:bg-white/10"
           >
-            查看审核流程
-          </a>
+            先看一份示例报告
+          </Link>
         </div>
       </div>
     </section>

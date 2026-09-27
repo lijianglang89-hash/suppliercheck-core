@@ -41,7 +41,7 @@ export const config = {
     "/suppliers/:path*",
     "/reviews/:path*",
     "/reports/:path*",
-    "/templates/:path*",
+    "/review-templates/:path*",
     "/settings/:path*",
   ],
 };

@@ -1,0 +1,440 @@
+<!doctype html>
+<!--
+  OG 分享图源（1200 × 630）。
+
+  ⚠️ 这不是页面，是一张"名片"的设计源文件，由 scripts/brand/make-brand-assets.mjs
+  用 headless Chrome 渲染成 public/og-image.png。**改这里之后必须重跑生成脚本**，
+  不要手改产出的 PNG。
+
+  为什么不用 next/og 动态生成：next/og 内置的默认字体是 Geist-Regular，
+  实测（fontTools 读 cmap）它只有 973 个字形、一个 CJK 字形都没有 ——
+  中文会渲染成豆腐块。要修就得往镜像里塞一份中文字体（体积与授权都是负担），
+  而分享图的文案是固定的，静态出图是更省事也更可控的做法。
+
+  版式纪律：
+  - 安全区 1080 × 560（四周各留 60 / 35），微信与 WhatsApp 裁剪后核心信息仍在；
+  - 左文右图：标题讲价值，右侧放**真实产品界面**的示意（不是西装握手图）；
+  - 页面上出现的每个数字都来自代码：15 条规则、6 种格式、5 类维度。
+-->
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>OG · 供应商智审</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1200px;
+        height: 630px;
+        overflow: hidden;
+        background: #ffffff;
+        font-family:
+          system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei",
+          "Noto Sans CJK SC", sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .stage {
+        position: relative;
+        width: 1200px;
+        height: 630px;
+        padding: 56px 60px 40px;
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* 右侧品牌色环境光：只做氛围，不进文字区 */
+      .glow {
+        position: absolute;
+        right: -80px;
+        top: -60px;
+        width: 620px;
+        height: 460px;
+        background: radial-gradient(circle at 50% 50%, rgba(69, 123, 180, 0.18), rgba(69, 123, 180, 0) 68%);
+      }
+
+      /* ---------------- 顶部：品牌 + 域名 ---------------- */
+      .top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .lockup {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .lockup-text {
+        display: flex;
+        flex-direction: column;
+        line-height: 1;
+      }
+      .brand-name {
+        font-size: 22px;
+        font-weight: 700;
+        letter-spacing: -0.2px;
+        color: #161a21;
+      }
+      .brand-latin {
+        margin-top: 5px;
+        font-size: 11px;
+        letter-spacing: 2.4px;
+        color: #9aa2ad;
+      }
+      .domain {
+        font-size: 16px;
+        color: #6b7482;
+        letter-spacing: 0.2px;
+      }
+
+      /* ---------------- 主体：左文右图 ---------------- */
+      .body {
+        margin-top: 42px;
+        flex: 1;
+        display: flex;
+        gap: 56px;
+      }
+      .left {
+        width: 520px;
+      }
+      .kicker {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 12px;
+        border: 1px solid #c5d9ee;
+        border-radius: 999px;
+        background: #f2f6fb;
+        color: #274e7b;
+        font-size: 14px;
+        font-weight: 500;
+      }
+      h1 {
+        margin-top: 22px;
+        font-size: 58px;
+        font-weight: 700;
+        line-height: 1.16;
+        letter-spacing: -1px;
+        color: #161a21;
+      }
+      h1 em {
+        font-style: normal;
+        color: #2f6097;
+      }
+      .lede {
+        margin-top: 20px;
+        font-size: 21px;
+        line-height: 1.7;
+        color: #4d5563;
+      }
+      .chips {
+        margin-top: 30px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      .chip {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 8px 13px;
+        border: 1px solid #e2e5e9;
+        border-radius: 8px;
+        background: #ffffff;
+        font-size: 15px;
+        color: #363d49;
+      }
+      .chip-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 999px;
+        background: #2f6097;
+      }
+
+      /* 右侧：产品界面示意（.card 语言：白底 + 细边框 + 投影） */
+      .panel {
+        position: relative;
+        flex: 1;
+        align-self: flex-start;
+        border: 1px solid #e2e5e9;
+        border-radius: 14px;
+        background: #ffffff;
+        box-shadow: 0 16px 40px rgba(23, 44, 70, 0.1);
+        padding: 18px;
+      }
+      .panel-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+      }
+      .panel-title {
+        font-size: 17px;
+        font-weight: 600;
+        color: #161a21;
+      }
+      .tag-demo {
+        padding: 3px 7px;
+        border-radius: 5px;
+        background: #eef0f2;
+        font-size: 11px;
+        color: #6b7482;
+      }
+      .files {
+        margin-top: 14px;
+        display: flex;
+        gap: 7px;
+      }
+      .file {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 8px;
+        border: 1px solid #e2e5e9;
+        border-radius: 7px;
+        background: #ffffff;
+        font-size: 12px;
+        color: #363d49;
+      }
+      .ext {
+        padding: 2px 5px;
+        border-radius: 4px;
+        background: rgba(47, 96, 151, 0.1);
+        color: #2f6097;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.4px;
+      }
+      .rule-count {
+        margin: 14px 0 10px;
+        text-align: center;
+        font-size: 12px;
+        color: #9aa2ad;
+      }
+      .rows {
+        border: 1px solid #eef0f2;
+        border-radius: 10px;
+        overflow: hidden;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 11px 12px;
+        border-bottom: 1px solid #eef0f2;
+      }
+      .row:last-child {
+        border-bottom: none;
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        flex: none;
+      }
+      .row-label {
+        flex: 1;
+        font-size: 14px;
+        color: #232932;
+      }
+      .pill {
+        padding: 3px 8px;
+        border-radius: 5px;
+        font-size: 12px;
+        font-weight: 500;
+      }
+      .pill-pass {
+        background: rgba(31, 122, 77, 0.1);
+        color: #1f7a4d;
+      }
+      .pill-warn {
+        background: rgba(163, 90, 6, 0.1);
+        color: #a35a06;
+      }
+      .pill-fail {
+        background: rgba(179, 38, 30, 0.1);
+        color: #b3261e;
+      }
+      .sev {
+        margin-top: 14px;
+      }
+      .sev-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        font-size: 12px;
+        color: #363d49;
+      }
+      .sev-legend {
+        font-size: 11px;
+        color: #9aa2ad;
+      }
+      .sev-bar {
+        margin-top: 7px;
+        display: flex;
+        height: 8px;
+        border-radius: 999px;
+        overflow: hidden;
+        background: #eef0f2;
+      }
+      .panel-foot {
+        margin-top: 12px;
+        font-size: 11px;
+        line-height: 1.6;
+        color: #9aa2ad;
+      }
+
+      /* ---------------- 底部：维度条 + 边界声明 ---------------- */
+      .bottom {
+        margin-top: 10px;
+        padding-top: 16px;
+        border-top: 1px solid #e2e5e9;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 24px;
+      }
+      .dims {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 15px;
+        color: #4d5563;
+      }
+      .dim-sep {
+        width: 1px;
+        height: 12px;
+        background: #cbd0d7;
+      }
+      .boundary {
+        padding-left: 12px;
+        border-left: 2px solid #9bbde0;
+        font-size: 14px;
+        color: #6b7482;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="stage">
+      <div class="glow"></div>
+
+      <div class="top">
+        <div class="lockup">
+          <!-- 品牌标识：文件 + 判定徽章（与 components/brand/logo.tsx 同一图形） -->
+          <svg width="44" height="44" viewBox="0 0 32 32" aria-hidden="true">
+            <g fill="none" stroke="#2f6097" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M7.5 5h8l4 4v18h-12z" />
+              <path d="M15.5 5v4h4" />
+              <path d="M11 14h6" />
+              <path d="M11 18h6" />
+            </g>
+            <circle cx="23" cy="23" r="7" fill="#2f6097" />
+            <path d="M20.2 23.1l2.1 2.1 3.6-3.6" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <div class="lockup-text">
+            <span class="brand-name">供应商智审</span>
+            <span class="brand-latin">SUPPLIERCHECK</span>
+          </div>
+        </div>
+        <div class="domain">supplier.ultron.xin</div>
+      </div>
+
+      <div class="body">
+        <div class="left">
+          <div class="kicker">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#274e7b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M14 3v5h5" />
+              <path d="M19 8v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7z" />
+              <path d="M9 15l2 2 4-4" />
+            </svg>
+            面向企业采购与供应链团队
+          </div>
+
+          <h1>供应商资料审核<br />逐条核对，<em>可追溯</em></h1>
+
+          <p class="lede">
+            上传一份资料包，自动识别文件并提取正文，逐条核对资料完整性、证照有效期、统一社会信用代码与主体一致性。
+          </p>
+
+          <div class="chips">
+            <span class="chip"><i class="chip-dot"></i>15 条确定性规则</span>
+            <span class="chip"><i class="chip-dot"></i>6 种文件格式</span>
+            <span class="chip"><i class="chip-dot"></i>每条发现附原文摘录</span>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <span class="panel-title">示例科技有限公司</span>
+            <span class="tag-demo">示例数据</span>
+          </div>
+
+          <div class="files">
+            <span class="file"><span class="ext">PDF</span>营业执照</span>
+            <span class="file"><span class="ext">PDF</span>ISO9001 证书</span>
+            <span class="file"><span class="ext">XLSX</span>报价单</span>
+          </div>
+
+          <div class="rule-count">15 条规则逐条核对</div>
+
+          <div class="rows">
+            <div class="row">
+              <span class="dot" style="background: #1f7a4d"></span>
+              <span class="row-label">营业执照在有效期内</span>
+              <span class="pill pill-pass">通过</span>
+            </div>
+            <div class="row">
+              <span class="dot" style="background: #a35a06"></span>
+              <span class="row-label">ISO9001 证书 42 天后到期</span>
+              <span class="pill pill-warn">待确认</span>
+            </div>
+            <div class="row">
+              <span class="dot" style="background: #b3261e"></span>
+              <span class="row-label">资料包中未找到检测报告</span>
+              <span class="pill pill-fail">问题</span>
+            </div>
+            <div class="row">
+              <span class="dot" style="background: #a35a06"></span>
+              <span class="row-label">开户资料主体名称不一致</span>
+              <span class="pill pill-warn">待确认</span>
+            </div>
+          </div>
+
+          <!-- 严重度分布条：与 components/ui/severity-bar.tsx 同一套语义色 -->
+          <div class="sev">
+            <div class="sev-head">
+              <span>严重度分布</span>
+              <span class="sev-legend">严重 1 · 高 1 · 中 2 · 提示 3</span>
+            </div>
+            <div class="sev-bar">
+              <i style="width: 14%; background: #ef4444"></i>
+              <i style="width: 14%; background: #f97316"></i>
+              <i style="width: 29%; background: #fbbf24"></i>
+              <i style="width: 43%; background: #38bdf8"></i>
+            </div>
+          </div>
+
+          <p class="panel-foot">以上为界面示意，公司名与发现条数均为示例，不代表任何真实审核结果。</p>
+        </div>
+      </div>
+
+      <div class="bottom">
+        <div class="dims">
+          <span>资料完整性</span>
+          <i class="dim-sep"></i>
+          <span>主体与身份</span>
+          <i class="dim-sep"></i>
+          <span>证照有效期</span>
+          <i class="dim-sep"></i>
+          <span>数据一致性</span>
+          <i class="dim-sep"></i>
+          <span>正文可用性</span>
+        </div>
+        <div class="boundary">系统给出证据，判定权在人手里</div>
+      </div>
+    </div>
+  </body>
+</html>

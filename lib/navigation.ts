@@ -51,7 +51,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     items: [
       {
         label: "审核模板",
-        href: "/templates",
+        href: "/review-templates",
         hint: "定义必备资料清单与审核规则",
         icon: "template",
       },
@@ -70,6 +70,6 @@ export const PLANNED_ROUTES = [
   "/suppliers",
   "/reviews",
   "/reports",
-  "/templates",
+  "/review-templates",
   "/settings",
 ] as const;

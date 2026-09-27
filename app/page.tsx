@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { FloatCard, ReportFragment } from "@/components/landing/visuals";
+import { ContentHubSection } from "@/components/landing/content-hub-section";
 import { ReportSection } from "@/components/landing/report-section";
 import {
   BeforeAfterSection,
@@ -39,7 +40,7 @@ const FAQS: ReadonlyArray<{ question: string; answer: string }> = [
   {
     question: "审核结论是怎么得出的？",
     answer:
-      "由 15 条确定性规则逐条核对得出，每条发现都标注规则、所在文件与原文摘录。同一份资料跑两次结果一致。当前未启用模型复核，因此不会出现无法复算的判断。",
+      `由 ${REVIEW_RULES.length} 条确定性规则逐条核对得出，每条发现都标注规则、所在文件与原文摘录。同一份资料跑两次结果一致。当前未启用模型复核，因此不会出现无法复算的判断。`,
   },
   {
     question: "系统会替我判断供应商是否合格吗？",
@@ -54,7 +55,7 @@ const FAQS: ReadonlyArray<{ question: string; answer: string }> = [
   {
     question: "现在可以免费使用吗？",
     answer:
-      "可以。当前版本已可跑完整链路：上传 → 解析 → 规则审核 → 报告。审核结论由 15 条确定性规则产出（可复算、可追溯），不是模型猜测。正式定价尚未公布。",
+      `可以。当前版本已可跑完整链路：上传 → 解析 → 规则审核 → 报告。审核结论由 ${REVIEW_RULES.length} 条确定性规则产出（可复算、可追溯），不是模型猜测。正式定价尚未公布。`,
   },
 ];
 
@@ -155,7 +156,7 @@ export default function HomePage() {
                 </p>
                 {/*
                   标题刻意不写「交给 AI」。
-                  审核结论由 15 条确定性规则产出，不是模型判断 ——
+                  审核结论由 REVIEW_RULES.length 条确定性规则产出（页面上按实际条数渲染），不是模型判断 ——
                   写成 AI 就是把规则包装成它自己不是的东西（docs/DESIGN.md §0 硬规则 1）。
 
                   字重只用 bold：实测（Windows Chrome + 雅黑，canvas 像素计量）
@@ -209,7 +210,8 @@ export default function HomePage() {
                 </div>
 
                 <p className="mt-6 text-xs text-ink-500">
-                  V0.3 · {REVIEW_RULES.length} 条审核规则已上线，可跑完整审核并输出报告；模型复核尚未启用
+                  V{siteConfig.version} · {REVIEW_RULES.length}{" "}
+                  条审核规则已上线，可跑完整审核并输出报告；模型复核尚未启用
                 </p>
               </div>
 
@@ -222,8 +224,11 @@ export default function HomePage() {
                   浮层必须落在**空白处**：实测过 -bottom-10/-left-10 的写法，
                   它会压住发现清单最后一行（重叠 3477px²）—— 破形是让它跳出容器，
                   不是让它盖住内容。
+                  ⚠️ 预留高度随浮层高度走：Alert Card 改成三层结构后高度约 70px，
+                  pb-16（64px）已经装不下，实测又压住清单最后一行 3003px² ——
+                  所以这里用 pb-24（96px）。改浮层内容后必须重测重叠面积。
                 */}
-                <div className="relative lg:pb-16">
+                <div className="relative lg:pb-24">
                   <div className="flex items-baseline justify-between gap-3 pb-2">
                     <p className="text-sm font-semibold text-ink-900">审核报告</p>
                     <span className="rounded bg-ink-100 px-2 py-0.5 text-[11px] text-ink-500">
@@ -238,7 +243,8 @@ export default function HomePage() {
                     tone="danger"
                     icon="alert-triangle"
                     title="证照已过期"
-                    detail="ISO9001 证书 · 阻断项"
+                    badge="阻断项"
+                    subject="对象：ISO9001 证书"
                     className="mt-3 lg:absolute lg:bottom-0 lg:-left-6 lg:mt-0"
                   />
 
@@ -246,8 +252,9 @@ export default function HomePage() {
                   <FloatCard
                     tone="success"
                     icon="check-circle"
-                    title="统一社会信用代码校验通过"
-                    detail="GB 32100 · 校验位一致"
+                    title="校验通过"
+                    badge="通过"
+                    subject="对象：统一社会信用代码 · GB 32100"
                     className="mt-3 lg:absolute lg:-right-6 lg:-top-20 lg:mt-0"
                   />
                 </div>
@@ -290,6 +297,9 @@ export default function HomePage() {
             </div>
           </div>
         </section>
+
+        {/* 内容页导流：把首页权重导向 /templates，同时给访客一个"不注册也能拿走"的出口 */}
+        <ContentHubSection />
 
         <FinalCtaSection />
       </main>

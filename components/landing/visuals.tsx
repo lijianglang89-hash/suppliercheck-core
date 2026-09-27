@@ -12,6 +12,7 @@
  * 让它们浮在区块底色之上 —— 扁平贴底的截图看着像插图，不像软件。
  */
 
+import { AlertCard, type AlertTone } from "@/components/ui/alert-card";
 import { Icon, type IconName } from "@/components/ui/icons";
 
 type Status = "pass" | "warn" | "fail";
@@ -274,43 +275,29 @@ export function ReportFragment({
  *
  * 4px 白边 + 2xl 阴影是刻意的 —— 白边让它和底下的界面彻底分离，
  * 重阴影提供 Z 轴高度。小屏下不做绝对定位（会溢出破版），改为堆叠在主卡下方。
+ *
+ * 内容一律交给 AlertCard：状态 / 定性 / 对象三层分开排，
+ * 不再把「证照已过期 ISO9001 证书 · 阻断项」挤成一行 ——
+ * 一行平铺的负面信息看着就是一块补丁，读者还得自己拆句子。
  */
 export function FloatCard({
   tone,
   icon,
   title,
-  detail,
+  badge,
+  subject,
   className = "",
 }: {
-  tone: "danger" | "success";
+  tone: AlertTone;
   icon: IconName;
   title: string;
-  detail: string;
+  badge?: string;
+  subject?: string;
   className?: string;
 }) {
-  const toneClass =
-    tone === "danger"
-      ? "border-red-100 text-danger-600"
-      : "border-emerald-100 text-success-600";
-
   return (
-    <div
-      className={`card w-56 border-4 border-white shadow-2xl ${toneClass} ${className}`}
-    >
-      <div className="flex items-start gap-2 p-3">
-        <span
-          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${
-            tone === "danger" ? "bg-red-50 text-danger-600" : "bg-emerald-50 text-success-600"
-          }`}
-          aria-hidden="true"
-        >
-          <Icon name={icon} className="h-3.5 w-3.5" />
-        </span>
-        <div className="min-w-0">
-          <p className="text-xs font-semibold text-ink-900">{title}</p>
-          <p className="mt-0.5 text-[11px] leading-4 text-ink-500">{detail}</p>
-        </div>
-      </div>
+    <div className={`w-64 rounded-md border-4 border-white bg-white shadow-2xl ${className}`}>
+      <AlertCard tone={tone} icon={icon} title={title} badge={badge} subject={subject} />
     </div>
   );
 }

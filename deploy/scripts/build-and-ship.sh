@@ -87,8 +87,15 @@ mv /tmp/docker-compose.yml docker-compose.yml
 sudo docker load -i /tmp/$(basename "${TARBALL}")
 rm -f /tmp/$(basename "${TARBALL}")
 # ⚠️ 环境变量必须写在 sudo 之后。
-# `APP_IMAGE=x sudo docker compose` 是错的：sudo 默认 env_reset，会把变量丢掉，
-# 于是 compose 回落到默认 image，`up -d` 一路 Successfully 却什么都没换。
+# 写成「APP_IMAGE=x sudo docker compose」是错的：sudo 默认 env_reset，会把变量丢掉，
+# 于是 compose 回落到默认 image，「up -d」一路 Successfully 却什么都没换。
+#
+# ⚠️⚠️ 这是**不加引号的 heredoc**（<<REMOTE），bash 会对正文做命令替换。
+# 所以正文里一个反引号都不能有（包括注释里！）：
+# 曾经注释里写了「up -d」外加反引号，本机会真的把它当命令执行，
+# 报 "up: command not found"，并在 set -e 下让整个脚本提前退出 ——
+# 远端其实已经全部执行完了，纯属本地副作用。要强调命令一律用「」或普通引号。
+# 讽刺的是，写这条注释时我又在注释里打了一次反引号，于是报错翻倍（第三次才干净）。
 sudo APP_IMAGE=${IMAGE_NAME}:${TAG} docker compose up -d app
 sleep 10
 # 核对实际生效的镜像与启动时间，别只信 ps 里的 healthy
@@ -109,8 +116,9 @@ cat <<EOF
   ssh -i ${SSH_KEY} ${REMOTE_HOST} "sudo docker inspect suppliercheck-app --format '{{.Config.Image}}'"
 
 > 这一步不是形式主义。本脚本第一版在这连栽两次：
-> ① `APP_IMAGE=x sudo` → sudo 丢弃变量；② 远端 compose 是旧版 → 覆盖了也没用。
-> 两次都表现为「命令成功、容器照旧」。只有查 `docker inspect` 的 Image 字段才看得出来。
+> ① 「APP_IMAGE=x sudo」→ sudo 丢弃变量；② 远端 compose 是旧版 → 覆盖了也没用。
+> 两次都表现为「命令成功、容器照旧」。只有查「docker inspect」的 Image 字段才看得出来。
+> （这里的反引号同样会被本 heredoc 命令替换掉，所以一律不写。）
 
 回滚（同样注意 sudo 的位置）：
   ssh -i ${SSH_KEY} ${REMOTE_HOST} "cd ${REMOTE_DIR} && sudo APP_IMAGE=${IMAGE_NAME}:0.3.0 docker compose up -d app"

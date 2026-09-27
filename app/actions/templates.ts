@@ -124,7 +124,7 @@ export async function createTemplateAction(
     return formError(raw, appError.message);
   }
 
-  revalidatePath("/templates");
+  revalidatePath("/review-templates");
   revalidatePath("/reviews");
   return {
     ...EMPTY_FORM_STATE,
@@ -160,7 +160,7 @@ export async function updateTemplateAction(
     return formError(raw, appError.message);
   }
 
-  revalidatePath("/templates");
+  revalidatePath("/review-templates");
   revalidatePath("/reviews");
   return { ...EMPTY_FORM_STATE, status: "success", success: "已保存模板。" };
 }
@@ -184,7 +184,7 @@ export async function duplicateBuiltinTemplateAction(formData: FormData): Promis
     config: builtin.config,
   });
 
-  revalidatePath("/templates");
+  revalidatePath("/review-templates");
   revalidatePath("/reviews");
 }
 
@@ -204,6 +204,6 @@ export async function deleteTemplateAction(formData: FormData): Promise<void> {
     operation: "delete",
   });
 
-  revalidatePath("/templates");
+  revalidatePath("/review-templates");
   revalidatePath("/reviews");
 }

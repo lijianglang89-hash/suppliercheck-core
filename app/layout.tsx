@@ -41,6 +41,14 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: siteConfig.name }],
   alternates: { canonical: "/" },
+  /*
+   * 分享图用**静态 PNG**，不用 next/og 动态生成。
+   * 实测（fontTools 读 cmap）：next/og 的默认字体 Geist-Regular 只有 973 个字形，
+   * 一个 CJK 字形都没有 —— 动态图上的中文必然是豆腐块。
+   * 修它要往镜像里塞中文字体（体积 + 授权两头负担），而分享图文案是固定的，
+   * 静态出图更可控：scripts/brand/make-brand-assets.mjs 出图，产物提交进 public/。
+   * 改文案请改 scripts/brand/og.html 后重跑脚本，不要手改 PNG。
+   */
   openGraph: {
     type: "website",
     locale: "zh_CN",
@@ -50,7 +58,7 @@ export const metadata: Metadata = {
     description: siteConfig.description,
     images: [
       {
-        url: "/og",
+        url: "/og-image.png",
         width: 1200,
         height: 630,
         alt: `${siteConfig.name} —— ${siteConfig.tagline}`,
@@ -61,8 +69,28 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: `${siteConfig.name} · ${siteConfig.tagline}`,
     description: siteConfig.description,
-    images: ["/og"],
+    images: ["/og-image.png"],
   },
+  /*
+   * Favicon 三件套：
+   * - /icon.svg 由 app/icon.svg 文件约定自动产出（矢量，现代浏览器首选）；
+   * - /favicon.ico（32×32）留给旧浏览器与 RSS 抓取工具；
+   * - /apple-touch-icon.png（180×180，不透明底）给 iOS 桌面书签。
+   * 这里不再重复声明 svg —— 否则 head 里会出现两条 icon 链接。
+   */
+  icons: {
+    /*
+     * svg 必须显式列出：一旦在 metadata 里声明 icons，
+     * app/icon.svg 的文件约定就不再自动产出 link（实测 head 里只剩 ico），
+     * 现代浏览器会退回用 32×32 的 ico —— 高分屏标签页上就是糊的。
+     */
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico", sizes: "32x32" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
+  },
+  manifest: "/manifest.webmanifest",
   robots: {
     index: true,
     follow: true,

@@ -9,7 +9,7 @@ import { siteConfig } from "@/lib/site";
  */
 export function SiteHeader() {
   return (
-    <header className="border-b border-ink-200 bg-white">
+    <header className="border-b border-ink-200 bg-white print:hidden">
       <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-6">
         {/*
           品牌用简称，全称留给 SEO 与正式描述（见 docs/DESIGN.md §1）。
@@ -26,6 +26,13 @@ export function SiteHeader() {
         </Link>
 
         <nav aria-label="主导航" className="flex items-center gap-1 sm:gap-2">
+          {/* 内容页入口：让爬虫从每个公开页都能走到 /templates，不依赖 sitemap 单点发现 */}
+          <Link
+            href="/templates"
+            className="hidden rounded-md px-3 py-2 text-sm font-medium text-ink-600 hover:text-ink-900 sm:block"
+          >
+            资料核验清单
+          </Link>
           <Link
             href="/login"
             className="rounded-md px-3 py-2 text-sm font-medium text-ink-600 hover:text-ink-900"

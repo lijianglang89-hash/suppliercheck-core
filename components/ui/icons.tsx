@@ -33,7 +33,11 @@ export type IconName =
   | "clock"
   | "inbox"
   | "user"
-  | "external";
+  | "external"
+  | "printer"
+  | "lock"
+  | "shield"
+  | "trash";
 
 const ICON_PATHS: Record<IconName, ReactNode> = {
   dashboard: (
@@ -149,6 +153,34 @@ const ICON_PATHS: Record<IconName, ReactNode> = {
       <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
       <path d="M15 3h6v6" />
       <path d="M10 14L21 3" />
+    </>
+  ),
+  printer: (
+    <>
+      <path d="M6 9V3h12v6" />
+      <path d="M18 10h2a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2" />
+      <path d="M6 10H4a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h2" />
+      <path d="M6 14h12v7H6z" />
+    </>
+  ),
+  lock: (
+    <>
+      <rect x="4" y="10" width="16" height="11" rx="2" />
+      <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+    </>
+  ),
+  shield: (
+    <>
+      <path d="M12 3l8 3v6c0 5-3.4 8.3-8 9-4.6-.7-8-4-8-9V6z" />
+      <path d="M9 12l2 2 4-4" />
+    </>
+  ),
+  trash: (
+    <>
+      <path d="M4 7h16" />
+      <path d="M9 7V4h6v3" />
+      <path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13" />
+      <path d="M10 11v6M14 11v6" />
     </>
   ),
 };

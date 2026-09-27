@@ -11,6 +11,6 @@ import { ProtectedShell } from "@/components/dashboard/protected-shell";
  */
 export const dynamic = "force-dynamic";
 
-export default async function TemplatesLayout({ children }: { children: React.ReactNode }) {
-  return <ProtectedShell nextPath="/templates">{children}</ProtectedShell>;
+export default async function ReviewTemplatesLayout({ children }: { children: React.ReactNode }) {
+  return <ProtectedShell nextPath="/review-templates">{children}</ProtectedShell>;
 }
