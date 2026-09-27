@@ -48,6 +48,11 @@
      之前 #f7f8f9 vs #fff 明度差不足 6%，整页看起来是平的。 */
   --color-canvas: #eef1f5;
 
+  /* 落地页色带：浅蓝与浅灰两档，用于「白 / 浅蓝 / 白 / 浅灰」纵向交替。
+     原来落地页只用了 ink-50（#f7f8f9），浅到看不出去，整页像一张白纸长卷。 */
+  --color-band: #f4f7fb;
+  --color-band-alt: #eef1f5;
+
   --color-success-600: #1f7a4d;
   --color-warning-600: #a35a06;
   --color-danger-600: #b3261e;
@@ -77,6 +82,23 @@ body {
   border: 1px solid var(--color-ink-200);
   border-radius: var(--radius-card);
   box-shadow: 0 1px 2px rgb(22 26 33 / 0.05);
+}
+
+/* 浅底变体：卡片层级里需要"第二层"时用（例如白卡片上的浅蓝节点）。 */
+.card-soft {
+  background-color: var(--color-brand-mist);
+  border: 1px solid var(--color-ink-200);
+  border-radius: var(--radius-card);
+  box-shadow: 0 1px 2px rgb(22 26 33 / 0.05);
+}
+
+/*
+ * 点阵底纹 —— 只做「工程感」，不做弥散光。
+ * 用于首屏产品视觉的底层，露出卡片四周一圈；卡片本体是纯白，纹理不进内容区。
+ */
+.dot-grid {
+  background-image: radial-gradient(circle, var(--color-ink-300) 1px, transparent 1px);
+  background-size: 16px 16px;
 }
 
 /* 焦点可见性：键盘用户优先，符合企业采购/合规类产品的可达性要求 */

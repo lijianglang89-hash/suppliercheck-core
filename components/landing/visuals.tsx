@@ -7,7 +7,12 @@
  *
  * ⚠️ 这些组件渲染的都是**示例数据**。任何用到它们的区块都必须在显眼处标注
  * 「示例数据」，否则就是把造出来的东西当真证据。
+ *
+ * 容器纪律：所有"产品界面片段"一律装进 .card / .card-soft，
+ * 让它们浮在区块底色之上 —— 扁平贴底的截图看着像插图，不像软件。
  */
+
+import { Icon, type IconName } from "@/components/ui/icons";
 
 type Status = "pass" | "warn" | "fail";
 
@@ -88,11 +93,13 @@ export function CheckFanout({
     count: number;
     status: Status;
     headline: string;
+    icon: IconName;
+    tone: string;
   }[];
 }) {
   return (
-    <div className="rounded-lg border border-ink-200 bg-white p-4">
-      <div className="flex items-center justify-between gap-3 rounded-md bg-brand-mist px-3 py-2">
+    <div className="card p-4">
+      <div className="card-soft flex items-center justify-between gap-3 px-3 py-2">
         <span className="text-sm font-medium text-ink-800">供应商资料包</span>
         <span className="text-[11px] text-ink-500">一次导入 · 并发核对</span>
       </div>
@@ -105,15 +112,18 @@ export function CheckFanout({
 
       <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
         {groups.map((group) => (
-          <li
-            key={group.label}
-            className="rounded-md border border-ink-200 bg-brand-mist px-2.5 py-2"
-          >
-            <div className="flex items-baseline justify-between gap-1">
-              <span className="truncate text-xs font-medium text-ink-800">{group.label}</span>
+          <li key={group.label} className="card-soft px-2.5 py-2">
+            <div className="flex items-center justify-between gap-1">
+              <span
+                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded ${group.tone}`}
+                aria-hidden="true"
+              >
+                <Icon name={group.icon} className="h-3.5 w-3.5" />
+              </span>
               <span className="shrink-0 text-[11px] tabular-nums text-ink-500">{group.count} 条</span>
             </div>
-            <p className="mt-1.5 truncate text-[11px] leading-4 text-ink-500">{group.headline}</p>
+            <p className="mt-1.5 truncate text-xs font-medium text-ink-800">{group.label}</p>
+            <p className="mt-0.5 truncate text-[11px] leading-4 text-ink-500">{group.headline}</p>
             <div className="mt-1.5">
               <StatusPill status={group.status} />
             </div>
@@ -142,7 +152,7 @@ export function RulePipeline() {
   return (
     <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       {steps.map((step, index) => (
-        <li key={step.title} className="rounded-md border border-ink-200 bg-white px-3 py-2.5">
+        <li key={step.title} className="card px-3 py-2.5">
           <div className="flex items-center gap-2">
             <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-brand-600 text-[10px] font-semibold tabular-nums text-white">
               {index + 1}
@@ -171,11 +181,11 @@ export function StorageDiagram() {
   ];
 
   return (
-    <div className="rounded-lg border border-ink-200 bg-white p-5">
+    <div className="card p-5">
       <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {nodes.map((node, index) => (
           <li key={node.title} className="relative">
-            <div className="rounded-md border border-ink-200 bg-brand-mist px-3 py-2.5">
+            <div className="card-soft px-3 py-2.5">
               <p className="text-xs font-medium text-ink-800">{node.title}</p>
               <p className="mt-1 text-[11px] leading-4 text-ink-500">{node.detail}</p>
             </div>
@@ -204,7 +214,7 @@ export function ResultPanel({
   rows: readonly { label: string; status: Status; note: string }[];
 }) {
   return (
-    <div className="rounded-lg border border-ink-200 bg-white">
+    <div className="card overflow-hidden">
       <div className="grid grid-cols-3 divide-x divide-ink-200 border-b border-ink-200">
         <div className="px-3 py-2.5 text-center">
           <p className="text-lg font-semibold tabular-nums text-success-600">{summary.pass}</p>

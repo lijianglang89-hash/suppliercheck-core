@@ -10,6 +10,7 @@ import {
   MetricsSection,
   RulesSection,
   SecuritySection,
+  TrustStrip,
   WorkflowSection,
 } from "@/components/landing/sections";
 import { SiteFooter } from "@/components/site-footer";
@@ -158,24 +159,33 @@ export default function HomePage() {
                 </p>
               </div>
 
-              <div className="rounded-lg border border-ink-200 bg-brand-mist p-5">
-                <div className="flex items-baseline justify-between gap-3">
-                  <p className="text-sm font-semibold text-ink-900">资料包</p>
-                  <span className="rounded bg-white px-1.5 py-0.5 text-[11px] text-ink-500">
-                    示例数据
-                  </span>
+              {/*
+                右侧视觉：白卡片 + 底层点阵纹理。
+                点阵只在卡片四周露出一圈，不进内容区 —— 目的只有一个：
+                给首屏一点"工程感"的纵深，而不是靠弥散光或渐变撑气氛。
+              */}
+              <div className="relative">
+                <div aria-hidden="true" className="dot-grid absolute -inset-4 rounded-xl" />
+                <div className="card relative p-5">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <p className="text-sm font-semibold text-ink-900">资料包</p>
+                    <span className="rounded bg-ink-100 px-1.5 py-0.5 text-[11px] text-ink-500">
+                      示例数据
+                    </span>
+                  </div>
+                  <div className="mt-3">
+                    <FileStack files={HERO_FILES} />
+                  </div>
+                  <FlowArrow />
+                  <p className="mb-2 text-center text-[11px] text-ink-400">15 条规则逐条核对</p>
+                  <ResultPanel summary={{ pass: 14, warn: 3, fail: 1 }} rows={HERO_ROWS} />
                 </div>
-                <div className="mt-3">
-                  <FileStack files={HERO_FILES} />
-                </div>
-                <FlowArrow />
-                <p className="mb-2 text-center text-[11px] text-ink-400">15 条规则逐条核对</p>
-                <ResultPanel summary={{ pass: 14, warn: 3, fail: 1 }} rows={HERO_ROWS} />
               </div>
             </div>
           </div>
         </section>
 
+        <TrustStrip />
         <MetricsSection />
         <BeforeAfterSection />
         <ReportSection />

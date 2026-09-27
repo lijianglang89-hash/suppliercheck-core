@@ -24,7 +24,7 @@ const DEMO_ROWS = [
 
 export function ReportSection() {
   return (
-    <section aria-labelledby="report-heading" className="border-b border-ink-200 bg-brand-tint">
+    <section aria-labelledby="report-heading" className="border-b border-ink-200 bg-band-alt">
       <div className="mx-auto w-full max-w-6xl px-6 py-16 lg:py-20">
         <div className="grid gap-10 lg:grid-cols-2 lg:items-center">
           <div>
@@ -40,7 +40,7 @@ export function ReportSection() {
             </p>
           </div>
 
-          <div className="rounded-lg border border-ink-200 bg-white p-5">
+          <div className="card p-5">
             <div className="flex items-baseline justify-between gap-3">
               <p className="text-sm font-semibold text-ink-900">示例科技有限公司</p>
               <span className="rounded bg-ink-100 px-1.5 py-0.5 text-[11px] text-ink-500">

@@ -14,12 +14,31 @@ import Link from "next/link";
 
 import { CATEGORY_LABELS, CATEGORY_ORDER } from "@/lib/reviews/labels";
 import { REVIEW_RULES } from "@/lib/reviews/rules";
+import { ALLOWED_MIME_TYPES } from "@/lib/files";
+import type { FindingCategory } from "@/lib/reviews/types";
 import {
   CheckFanout,
   RulePipeline,
   StatusPill,
   StorageDiagram,
 } from "@/components/landing/visuals";
+import { Icon, type IconName } from "@/components/ui/icons";
+
+/**
+ * 每个检查维度的图标与语义色底框。
+ *
+ * 用 `Record<FindingCategory, ...>` 而不是在渲染处现填：新增一个维度时
+ * **编译期**就会在缺项处报错，而不是等页面上出现一个空白方块。
+ * 颜色只用于区分维度，不表达"好坏"（好坏由状态 pill 表达，见 docs/DESIGN.md §2）。
+ */
+const CATEGORY_ICONS: Record<FindingCategory, { icon: IconName; tone: string }> = {
+  COMPLETENESS: { icon: "clipboard", tone: "bg-brand-50 text-brand-700" },
+  READABILITY: { icon: "file", tone: "bg-sky-50 text-sky-700" },
+  ENTITY: { icon: "building", tone: "bg-amber-50 text-warning-600" },
+  VALIDITY: { icon: "clock", tone: "bg-emerald-50 text-success-600" },
+  CONSISTENCY: { icon: "check-circle", tone: "bg-violet-50 text-violet-700" },
+  AI: { icon: "settings", tone: "bg-ink-100 text-ink-600" },
+};
 
 /**
  * 这三个数字**运行时从 `REVIEW_RULES` 算出来**，不是写死的常量。
@@ -35,30 +54,97 @@ function buildMetrics() {
       value: String(REVIEW_RULES.length),
       label: "条审核规则",
       note: "完整性、有效期、主体、一致性",
+      icon: "clipboard" as IconName,
     },
     {
       value: String(activeCategories.size),
       label: "类检查维度",
       note: "每条发现都归入其中一类",
+      icon: "template" as IconName,
     },
-    { value: "1", label: "份审核报告", note: "问题清单 + 原文摘录" },
+    {
+      value: "1",
+      label: "份审核报告",
+      note: "问题清单 + 原文摘录",
+      icon: "file-check" as IconName,
+    },
   ] as const;
+}
+
+/**
+ * 支持格式 / 已实现机制横带。
+ *
+ * 这里**绝不放客户 Logo**：没有标杆客户就是没有，编一排假 Logo 是假证据
+ * （docs/DESIGN.md §0 硬规则 2）。改成放产品自己确有能力的东西 ——
+ * 格式白名单从 `ALLOWED_MIME_TYPES` 现算，改白名单当天这里跟着变；
+ * 三条机制都是 SecuritySection 里展开说明的、系统内已实现的行为。
+ *
+ * 视觉上它是一条灰度过渡带：把首屏的白色和内容区的色带分开。
+ */
+export function TrustStrip() {
+  const formats = Object.values(ALLOWED_MIME_TYPES).map((extension) =>
+    extension.replace(".", "").toUpperCase(),
+  );
+
+  const assurances = [
+    { icon: "check-circle" as IconName, text: "GB 32100 统一社会信用代码校验位" },
+    { icon: "archive" as IconName, text: "私有存储 · 无公开链接" },
+    { icon: "user" as IconName, text: "按工作区隔离" },
+  ];
+
+  return (
+    <section aria-label="支持的文件格式与已实现机制" className="border-b border-ink-200 bg-white">
+      <div className="mx-auto w-full max-w-6xl px-6 py-7">
+        <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-5">
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            {formats.map((format) => (
+              <span
+                key={format}
+                className="rounded border border-ink-200 bg-ink-50 px-2.5 py-1 text-xs font-medium tabular-nums tracking-wide text-ink-500"
+              >
+                {format}
+              </span>
+            ))}
+          </div>
+
+          <span aria-hidden="true" className="hidden h-6 w-px bg-ink-200 sm:block" />
+
+          <ul className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
+            {assurances.map((item) => (
+              <li key={item.text} className="flex items-center gap-1.5 text-xs text-ink-500">
+                <Icon name={item.icon} className="h-3.5 w-3.5 text-ink-400" />
+                {item.text}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </section>
+  );
 }
 
 export function MetricsSection() {
   const metrics = buildMetrics();
 
   return (
-    <section className="border-b border-ink-200 bg-brand-tint">
+    <section className="border-y border-ink-200 bg-band">
       <div className="mx-auto w-full max-w-6xl px-6 py-12 lg:py-14">
         <ul className="grid gap-8 sm:grid-cols-3">
           {metrics.map((item) => (
-            <li key={item.label}>
-              <p className="text-3xl font-semibold tabular-nums tracking-tight text-brand-700 lg:text-4xl">
-                {item.value}
-              </p>
-              <p className="mt-1 text-sm font-medium text-ink-800">{item.label}</p>
-              <p className="mt-1 text-xs leading-5 text-ink-500">{item.note}</p>
+            <li key={item.label} className="flex items-start gap-3">
+              <span
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-brand-700 ring-1 ring-brand-100"
+                aria-hidden="true"
+              >
+                <Icon name={item.icon} className="h-5 w-5" />
+              </span>
+              <div>
+                <p className="text-3xl font-semibold tabular-nums tracking-tight text-brand-700 lg:text-4xl">
+                  {item.value}
+                </p>
+                <p className="mt-1 text-sm font-medium text-ink-800">{item.label}</p>
+                <p className="mt-1 text-xs leading-5 text-ink-500">{item.note}</p>
+              </div>
             </li>
           ))}
         </ul>
@@ -78,8 +164,16 @@ export function BeforeAfterSection() {
           一份资料包，以前要怎么审
         </h2>
         <div className="mt-10 grid items-stretch gap-6 lg:grid-cols-2">
-          <div className="rounded-lg border border-ink-200 bg-ink-50 p-6">
-            <p className="text-xs font-semibold uppercase tracking-widest text-ink-400">以前</p>
+          <div className="card p-6">
+            <div className="flex items-center gap-2">
+              <span
+                className="flex h-8 w-8 items-center justify-center rounded-md bg-ink-100 text-ink-400"
+                aria-hidden="true"
+              >
+                <Icon name="file" className="h-4 w-4" />
+              </span>
+              <p className="text-xs font-semibold uppercase tracking-widest text-ink-400">以前</p>
+            </div>
             <ul className="mt-4 space-y-2.5 text-sm leading-6 text-ink-600">
               <li>逐个打开十几份文件，人眼找有效期</li>
               <li>把证照编号抄进表格，容易抄错一位</li>
@@ -88,8 +182,16 @@ export function BeforeAfterSection() {
             </ul>
           </div>
 
-          <div className="rounded-lg border border-brand-200 bg-brand-mist p-6">
-            <p className="text-xs font-semibold uppercase tracking-widest text-brand-600">现在</p>
+          <div className="card p-6">
+            <div className="flex items-center gap-2">
+              <span
+                className="flex h-8 w-8 items-center justify-center rounded-md bg-brand-50 text-brand-700"
+                aria-hidden="true"
+              >
+                <Icon name="check-circle" className="h-4 w-4" />
+              </span>
+              <p className="text-xs font-semibold uppercase tracking-widest text-brand-600">现在</p>
+            </div>
             <ul className="mt-4 space-y-2.5 text-sm leading-6 text-ink-700">
               <li>一次上传，自动提取正文</li>
               <li>统一社会信用代码按国标校验位核对</li>
@@ -116,11 +218,13 @@ export function BeforeAfterSection() {
  */
 const CAPABILITIES: ReadonlyArray<{
   title: string;
+  category: FindingCategory;
   detail: string;
   samples: readonly { text: string; status: "pass" | "warn" | "fail" }[];
 }> = [
   {
     title: "资料完整性",
+    category: "COMPLETENESS",
     detail: "对照审核模板检查必填项，直接列出缺什么。",
     samples: [
       { text: "缺少必备资料：检测报告", status: "fail" },
@@ -129,6 +233,7 @@ const CAPABILITIES: ReadonlyArray<{
   },
   {
     title: "正文可用性",
+    category: "READABILITY",
     detail: "扫不出正文、还是占位模板、是否被截断，都会如实提示而不是跳过。",
     samples: [
       { text: "扫描件无文字层，未参与审核", status: "warn" },
@@ -137,6 +242,7 @@ const CAPABILITIES: ReadonlyArray<{
   },
   {
     title: "主体与身份",
+    category: "ENTITY",
     detail: "按 GB 32100 校验统一社会信用代码，并比对各文件里的主体是否一致。",
     samples: [
       { text: "统一社会信用代码校验位错误", status: "fail" },
@@ -145,6 +251,7 @@ const CAPABILITIES: ReadonlyArray<{
   },
   {
     title: "证照有效期",
+    category: "VALIDITY",
     detail: "检查营业执照与资质证书是否过期或临期；写成「长期」的按长期处理。",
     samples: [
       { text: "证照即将到期（模板阈值内）", status: "warn" },
@@ -154,6 +261,7 @@ const CAPABILITIES: ReadonlyArray<{
   },
   {
     title: "数据一致性",
+    category: "CONSISTENCY",
     detail: "比对报价单与合同等文件中的金额大小写是否自洽。",
     samples: [{ text: "金额大小写不一致", status: "warn" }],
   },
@@ -180,7 +288,7 @@ export function CapabilitiesSection() {
   const demoStatus = ["fail", "warn", "warn", "warn", "pass"] as const;
 
   return (
-    <section aria-labelledby="capabilities-heading" className="border-b border-ink-200 bg-ink-50">
+    <section aria-labelledby="capabilities-heading" className="border-b border-ink-200 bg-white">
       <div className="mx-auto w-full max-w-6xl px-6 py-16 lg:py-20">
         <h2 id="capabilities-heading" className="text-2xl font-semibold tracking-tight text-ink-900">
           五类检查，一次跑完
@@ -197,6 +305,7 @@ export function CapabilitiesSection() {
               count: group.count,
               status: demoStatus[index],
               headline: CATEGORY_HEADLINES[group.category],
+              ...CATEGORY_ICONS[group.category],
             }))}
           />
           <p className="mt-2 text-[11px] leading-5 text-ink-500">
@@ -206,8 +315,16 @@ export function CapabilitiesSection() {
 
         <ul className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {CAPABILITIES.map((item) => (
-            <li key={item.title} className="rounded-lg border border-ink-200 bg-white p-5">
-              <h3 className="text-base font-semibold text-ink-900">{item.title}</h3>
+            <li key={item.title} className="card p-5">
+              <div className="flex items-center gap-2.5">
+                <span
+                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${CATEGORY_ICONS[item.category].tone}`}
+                  aria-hidden="true"
+                >
+                  <Icon name={CATEGORY_ICONS[item.category].icon} className="h-4 w-4" />
+                </span>
+                <h3 className="text-base font-semibold text-ink-900">{item.title}</h3>
+              </div>
               <p className="mt-2 text-sm leading-6 text-ink-600">{item.detail}</p>
               <ul className="mt-4 space-y-1.5 border-t border-ink-100 pt-3">
                 {item.samples.map((sample) => (
@@ -252,7 +369,7 @@ export function RulesSection() {
   })).filter((group) => group.rules.length > 0);
 
   return (
-    <section aria-labelledby="rules-heading" className="border-b border-ink-200 bg-white">
+    <section aria-labelledby="rules-heading" className="border-b border-ink-200 bg-band-alt">
       <div className="mx-auto w-full max-w-6xl px-6 py-16 lg:py-20">
         <h2 id="rules-heading" className="text-2xl font-semibold tracking-tight text-ink-900">
           不是一句「系统判断」，是 {REVIEW_RULES.length} 条写明的规则
@@ -269,9 +386,17 @@ export function RulesSection() {
 
         <div className="mt-10 grid gap-6 lg:grid-cols-2">
           {groups.map((group) => (
-            <div key={group.category} className="rounded-lg border border-ink-200 bg-brand-mist p-5">
+            <div key={group.category} className="card p-5">
               <div className="flex items-baseline justify-between gap-3">
-                <h3 className="text-base font-semibold text-ink-900">{group.label}</h3>
+                <span className="flex items-center gap-2.5">
+                  <span
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${CATEGORY_ICONS[group.category].tone}`}
+                    aria-hidden="true"
+                  >
+                    <Icon name={CATEGORY_ICONS[group.category].icon} className="h-4 w-4" />
+                  </span>
+                  <h3 className="text-base font-semibold text-ink-900">{group.label}</h3>
+                </span>
                 <span className="shrink-0 text-xs tabular-nums text-ink-500">
                   {group.rules.length} 条
                 </span>
@@ -432,7 +557,7 @@ export function WorkflowSection() {
               <h3 className="mt-3 text-base font-semibold text-ink-900">{item.title}</h3>
               <p className="mt-2 text-sm leading-6 text-ink-600">{item.detail}</p>
 
-              <div className="mt-3 rounded-md border border-ink-200 bg-brand-mist p-2.5">
+              <div className="card-soft mt-3 p-2.5">
                 <WorkflowSnippet snippet={item.snippet} />
               </div>
               <p className="mt-2 text-[11px] leading-5 text-ink-500">{item.snippet.note}</p>
@@ -444,16 +569,24 @@ export function WorkflowSection() {
   );
 }
 
-const SECURITY_ITEMS: ReadonlyArray<{ title: string; detail: string }> = [
-  { title: "私有存储", detail: "资料保存在私有目录，不生成可公开访问的链接。" },
-  { title: "工作区隔离", detail: "所有数据按工作区隔离，跨工作区读取在服务端被拒绝。" },
-  { title: "服务端权限校验", detail: "浏览器传入的工作区编号不作为授权依据，一律回库确认归属。" },
-  { title: "签名访问", detail: "查看原始文件需要带签名的临时地址，过期失效。" },
+const SECURITY_ITEMS: ReadonlyArray<{ title: string; detail: string; icon: IconName }> = [
+  { title: "私有存储", detail: "资料保存在私有目录，不生成可公开访问的链接。", icon: "archive" },
+  {
+    title: "工作区隔离",
+    detail: "所有数据按工作区隔离，跨工作区读取在服务端被拒绝。",
+    icon: "user",
+  },
+  {
+    title: "服务端权限校验",
+    detail: "浏览器传入的工作区编号不作为授权依据，一律回库确认归属。",
+    icon: "check-circle",
+  },
+  { title: "签名访问", detail: "查看原始文件需要带签名的临时地址，过期失效。", icon: "clock" },
 ];
 
 export function SecuritySection() {
   return (
-    <section aria-labelledby="security-heading" className="border-b border-ink-200 bg-ink-50">
+    <section aria-labelledby="security-heading" className="border-b border-ink-200 bg-band">
       <div className="mx-auto w-full max-w-6xl px-6 py-16 lg:py-20">
         <h2 id="security-heading" className="text-2xl font-semibold tracking-tight text-ink-900">
           资料怎么被保管
@@ -466,9 +599,17 @@ export function SecuritySection() {
         {/* 只陈述已实现的机制。未取得认证就不写认证 —— 见 docs/DESIGN.md §0 硬规则 2 */}
         <ul className="mt-8 grid gap-6 sm:grid-cols-2">
           {SECURITY_ITEMS.map((item) => (
-            <li key={item.title} className="border-l-2 border-brand-600 pl-4">
-              <h3 className="text-base font-semibold text-ink-900">{item.title}</h3>
-              <p className="mt-2 text-sm leading-6 text-ink-600">{item.detail}</p>
+            <li key={item.title} className="card flex gap-3 p-4">
+              <span
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-700"
+                aria-hidden="true"
+              >
+                <Icon name={item.icon} className="h-4 w-4" />
+              </span>
+              <div>
+                <h3 className="text-base font-semibold text-ink-900">{item.title}</h3>
+                <p className="mt-1 text-sm leading-6 text-ink-600">{item.detail}</p>
+              </div>
             </li>
           ))}
         </ul>
@@ -497,13 +638,16 @@ export function FinalCtaSection() {
         */}
         <ol className="mx-auto mt-8 grid max-w-3xl gap-3 text-left sm:grid-cols-3">
           {[
-            { step: "01", text: "注册并自动建好工作区" },
-            { step: "02", text: "上传一份资料包，或直接导入既有的" },
-            { step: "03", text: "选模板、发起审核，等待报告" },
+            { step: "01", text: "注册并自动建好工作区", icon: "user" as IconName },
+            { step: "02", text: "上传一份资料包，或直接导入既有的", icon: "upload" as IconName },
+            { step: "03", text: "选模板、发起审核，等待报告", icon: "file-check" as IconName },
           ].map((item) => (
             <li key={item.step} className="rounded-md border border-white/25 px-3 py-2.5">
-              <span className="text-[11px] font-semibold tabular-nums text-brand-200">
-                {item.step}
+              <span className="flex items-center gap-1.5">
+                <Icon name={item.icon} className="h-3.5 w-3.5 text-brand-200" />
+                <span className="text-[11px] font-semibold tabular-nums text-brand-200">
+                  {item.step}
+                </span>
               </span>
               <p className="mt-1 text-xs leading-5 text-white">{item.text}</p>
             </li>
