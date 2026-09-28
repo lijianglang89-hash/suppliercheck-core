@@ -28,6 +28,12 @@ vi.mock("@/lib/auth/session", () => ({
   readSession: async () => sessionStore.payload,
 }));
 
+// Action 成功路径会调 revalidatePath，vitest 没有 Next 的 static generation store
+// （Invariant: static generation store missing）。本文件钉的是授权逻辑，不是缓存失效。
+vi.mock("next/cache", () => ({
+  revalidatePath: vi.fn(),
+}));
+
 import ReviewDetailPage from "@/app/reviews/[reviewId]/page";
 import { rerunReviewAction } from "@/app/actions/reviews";
 import { closeDatabase, getDb } from "@/lib/db";
