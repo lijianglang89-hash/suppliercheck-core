@@ -12,7 +12,7 @@
  */
 
 import { errors } from "@/lib/errors";
-import { newRequestId, errorResponse, jsonOk } from "@/lib/api/route-utils";
+import { errorResponse, jsonOk, resolveRequestId } from "@/lib/api/route-utils";
 import { requireUser, requireWorkspaceAccess } from "@/lib/auth/guards";
 import { getEnv } from "@/lib/config/server-env";
 import { expandArchiveDocument, enqueueMany, storeUploadedFile } from "@/lib/documents/service";
@@ -25,7 +25,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request): Promise<Response> {
-  const requestId = newRequestId();
+  const requestId = resolveRequestId(request.headers.get("x-request-id"));
 
   try {
     const user = await requireUser();
@@ -73,14 +73,15 @@ export async function POST(request: Request): Promise<Response> {
 
     // 触发解析。enqueueMany 只做「原子认领 + 入队」，不等待解析完成，
     // 所以响应不会被解析阻塞；但状态在响应前已经翻到 PROCESSING，界面能立刻看到。
-    await enqueueMany([created.id, ...children.map((child) => child.id)]);
+    // requestId 随入队一起透传进后台解析任务（见 service.enqueueMany）。
+    await enqueueMany([created.id, ...children.map((child) => child.id)], { requestId });
 
     return jsonOk(
       {
         document: serializeDocument(created),
         children: children.map(serializeDocument),
       },
-      { status: 201 },
+      { status: 201, requestId },
     );
   } catch (error) {
     return errorResponse(error, requestId);

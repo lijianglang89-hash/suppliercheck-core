@@ -18,6 +18,7 @@ import { requireActionWorkspace, runIdempotentDelete } from "@/lib/auth/action-c
 import { EMPTY_FORM_STATE, type FormState } from "@/lib/forms/form-state";
 import { toAppError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
+import { newRequestId } from "@/lib/ids";
 import { MAX_RUN_NAME_CHARS } from "@/lib/reviews/limits";
 import { enforceRateLimit } from "@/lib/rate-limit/policy";
 import { findReviewRunById, softDeleteReviewRun } from "@/lib/reviews/repository";
@@ -60,16 +61,22 @@ export async function createReviewAction(
     // 审核是最重的一档资源消耗（引擎 + 串行队列 + 全量结论落库）。
     // 授权之后、落库之前；超限时 RATE_LIMITED 的用户文案会出现在表单错误里。
     enforceRateLimit("review", `${user.id}:${workspace.id}`);
-    const run = await createReviewRunAndEnqueue({
-      workspaceId: workspace.id,
-      userId: user.id,
-      templateKey: parsed.data.templateKey,
-      supplierId: parsed.data.supplierId.length > 0 ? parsed.data.supplierId : null,
-      documentIds: parsed.data.documentIds,
-      name: parsed.data.name.length > 0 ? parsed.data.name : null,
-    });
+    // 本次请求的唯一 trace id：穿透到后台审核任务的日志上下文，
+    // 让「发起审核」这一动作能从日志反查到具体的异步执行。
+    const requestId = newRequestId();
+    const run = await createReviewRunAndEnqueue(
+      {
+        workspaceId: workspace.id,
+        userId: user.id,
+        templateKey: parsed.data.templateKey,
+        supplierId: parsed.data.supplierId.length > 0 ? parsed.data.supplierId : null,
+        documentIds: parsed.data.documentIds,
+        name: parsed.data.name.length > 0 ? parsed.data.name : null,
+      },
+      { requestId },
+    );
     runId = run.id;
-    logger.info("已创建审核任务", { reviewRunId: runId, workspaceId: workspace.id });
+    logger.info("已创建审核任务", { reviewRunId: runId, workspaceId: workspace.id, requestId });
   } catch (error) {
     const appError = toAppError(error);
     logger.warn("创建审核任务失败", { code: appError.code });
@@ -99,7 +106,10 @@ export async function rerunReviewAction(
       return { status: "error", error: "没有找到对应的审核任务。" };
     }
 
-    const result = await enqueueReviewRun(runId);
+    // 本次请求的 trace id：穿透到后台审核任务日志（同新建路径）。
+    const requestId = newRequestId();
+    const result = await enqueueReviewRun(runId, { requestId });
+    logger.info("已提交重新审核", { reviewRunId: runId, workspaceId: workspace.id, requestId });
     message =
       result.queued === false && result.reason === "already_running"
         ? "该审核任务正在执行中，无需重复提交。"

@@ -26,10 +26,13 @@ export async function GET(request: Request): Promise<Response> {
 
     const rows = await listWorkspaceDocuments(workspace.id);
 
-    return jsonOk({
-      documents: rows.map(serializeListRow),
-      count: rows.length,
-    });
+    return jsonOk(
+      {
+        documents: rows.map(serializeListRow),
+        count: rows.length,
+      },
+      { requestId },
+    );
   } catch (error) {
     return errorResponse(error, requestId);
   }

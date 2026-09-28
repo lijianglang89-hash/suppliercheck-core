@@ -267,7 +267,10 @@ export interface EnqueueResult {
  * 关键在「认领」：状态先原子地翻到 PROCESSING，再进串行队列。
  * 这样同一次点击重复到达、或者使用者连点两次，也只有一次会真正干活。
  */
-export async function enqueueDocumentProcessing(documentId: string): Promise<EnqueueResult> {
+export async function enqueueDocumentProcessing(
+  documentId: string,
+  opts?: { requestId?: string },
+): Promise<EnqueueResult> {
   if (!isUuid(documentId)) return { queued: false, reason: "not_found" };
 
   const claimed = await claimDocumentForProcessing(documentId, STALE_JOB_THRESHOLD_MS);
@@ -281,18 +284,25 @@ export async function enqueueDocumentProcessing(documentId: string): Promise<Enq
   }
 
   // 不 await：调用方（after()）只负责排队，解析本身在串行队列里慢慢跑。
-  void runExclusive(() => runProcessing(claimed)).catch((error: unknown) => {
-    logger.error("解析任务异常退出", { documentId, error });
-  });
+  // requestId 随任务闭包一起透传进 runProcessing，穿透「入队即返回」的异步边界，
+  // 确保后台任务的每一条日志都能回溯到触发它的那次 HTTP 请求。
+  void runExclusive(() => runProcessing(claimed, { requestId: opts?.requestId })).catch(
+    (error: unknown) => {
+      logger.error("解析任务异常退出", { documentId, error });
+    },
+  );
 
   return { queued: true };
 }
 
 /** 批量触发，供上传路由使用。 */
-export async function enqueueMany(documentIds: readonly string[]): Promise<void> {
+export async function enqueueMany(
+  documentIds: readonly string[],
+  opts?: { requestId?: string },
+): Promise<void> {
   for (const documentId of documentIds) {
     try {
-      await enqueueDocumentProcessing(documentId);
+      await enqueueDocumentProcessing(documentId, { requestId: opts?.requestId });
     } catch (error) {
       logger.error("触发解析失败", { documentId, error });
     }
@@ -307,14 +317,25 @@ export async function enqueueMany(documentIds: readonly string[]): Promise<void>
  *     → 成功：READY/SUCCEEDED + 写入 document_texts
  *     → 失败：FAILED/FAILED + 记录安全化的错误信息
  */
-async function runProcessing(document: DocumentRow): Promise<void> {
+async function runProcessing(
+  document: DocumentRow,
+  opts?: { requestId?: string },
+): Promise<void> {
   const jobId = await startJob({
     workspaceId: document.workspaceId,
     documentId: document.id,
     jobType: EXTRACT_TEXT_JOB_TYPE,
   });
 
-  const log = logger.child({ jobId, workspaceId: document.workspaceId, documentId: document.id });
+  // 把入口请求带来的 requestId 合并进本任务的日志上下文，
+  // 于是「开始解析 / 解析完成 / 解析失败」每条日志都带着它 ——
+  // 一条后台任务可以从日志直接反查回触发的那次 HTTP 请求。
+  const log = logger.child({
+    ...(opts?.requestId ? { requestId: opts.requestId } : {}),
+    jobId,
+    workspaceId: document.workspaceId,
+    documentId: document.id,
+  });
 
   try {
     const parser = selectParser(document.mimeType);

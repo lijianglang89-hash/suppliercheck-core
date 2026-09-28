@@ -13,10 +13,8 @@ import { NextResponse } from "next/server";
 import { toAppError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 
-/** 生成一个请求标识。不引入额外依赖，够用来串联日志即可。 */
-export function newRequestId(): string {
-  return `req_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
-}
+// 请求标识生成 / 解析（与 next/server 解耦，见 lib/ids.ts）。
+export { newRequestId, resolveRequestId } from "@/lib/ids";
 
 export function errorResponse(error: unknown, requestId?: string): NextResponse {
   const appError = toAppError(error, { requestId });
@@ -37,6 +35,9 @@ export function errorResponse(error: unknown, requestId?: string): NextResponse 
     headers["Retry-After"] = String(Math.max(1, Math.ceil(retryAfter)));
   }
 
+  // 把 requestId 原样回传给调用方（与成功响应一致），便于端到端串联排查。
+  if (requestId) headers["X-Request-Id"] = requestId;
+
   return NextResponse.json(appError.toResponseBody(), {
     status: appError.status,
     headers,
@@ -44,10 +45,16 @@ export function errorResponse(error: unknown, requestId?: string): NextResponse 
 }
 
 /** 成功响应：统一禁缓存，避免任何带授权的响应被中间层缓存。 */
-export function jsonOk(body: unknown, init?: { status?: number }): NextResponse {
+export function jsonOk(
+  body: unknown,
+  init?: { status?: number; requestId?: string },
+): NextResponse {
+  const headers: Record<string, string> = { "Cache-Control": "no-store, max-age=0" };
+  // 把贯穿本次请求的 requestId 写进响应头，前端 / 网关可据此串联整条链路。
+  if (init?.requestId) headers["X-Request-Id"] = init.requestId;
   return NextResponse.json(body, {
     status: init?.status ?? 200,
-    headers: { "Cache-Control": "no-store, max-age=0" },
+    headers,
   });
 }
 

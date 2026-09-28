@@ -10,7 +10,7 @@
  */
 
 import { errors } from "@/lib/errors";
-import { errorResponse, jsonOk, newRequestId } from "@/lib/api/route-utils";
+import { errorResponse, jsonOk, resolveRequestId } from "@/lib/api/route-utils";
 import { requireUser, requireWorkspaceAccess } from "@/lib/auth/guards";
 import { isUuid } from "@/lib/files";
 import { findDocumentById } from "@/lib/documents/repository";
@@ -25,7 +25,7 @@ export async function POST(
   request: Request,
   context: { params: Promise<{ documentId: string }> },
 ): Promise<Response> {
-  const requestId = newRequestId();
+  const requestId = resolveRequestId(request.headers.get("x-request-id"));
 
   try {
     // 先要会话，再碰数据库：避免「未登录」的响应因 id 是否存在而不同（可枚举信号）。
@@ -47,14 +47,17 @@ export async function POST(
     // 授权之后、入队之前：重新解析与上传共用同一条串行队列，频次必须受控。
     enforceRateLimit("reprocess", `${user.id}:${document.workspaceId}`);
 
-    const result = await enqueueDocumentProcessing(documentId);
+    const result = await enqueueDocumentProcessing(documentId, { requestId });
     const refreshed = (await findDocumentById(documentId)) ?? document;
 
-    return jsonOk({
-      queued: result.queued,
-      ...(result.reason ? { reason: result.reason } : {}),
-      document: serializeDocument(refreshed),
-    });
+    return jsonOk(
+      {
+        queued: result.queued,
+        ...(result.reason ? { reason: result.reason } : {}),
+        document: serializeDocument(refreshed),
+      },
+      { requestId },
+    );
   } catch (error) {
     return errorResponse(error, requestId);
   }

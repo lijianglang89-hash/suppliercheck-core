@@ -45,21 +45,24 @@ export async function GET(
 
     const text = await findDocumentText(documentId);
 
-    return jsonOk({
-      document: serializeDocument(document),
-      extraction: text
-        ? {
-            parserId: text.parserId,
-            charCount: text.charCount,
-            truncated: text.truncated,
-            pageCount: text.pageCount,
-            notes: Array.isArray(text.notes) ? text.notes : [],
-            structure: text.structure,
-            preview: text.text.slice(0, PREVIEW_CHARS),
-            previewTruncated: text.text.length > PREVIEW_CHARS,
-          }
-        : null,
-    });
+    return jsonOk(
+      {
+        document: serializeDocument(document),
+        extraction: text
+          ? {
+              parserId: text.parserId,
+              charCount: text.charCount,
+              truncated: text.truncated,
+              pageCount: text.pageCount,
+              notes: Array.isArray(text.notes) ? text.notes : [],
+              structure: text.structure,
+              preview: text.text.slice(0, PREVIEW_CHARS),
+              previewTruncated: text.text.length > PREVIEW_CHARS,
+            }
+          : null,
+      },
+      { requestId },
+    );
   } catch (error) {
     return errorResponse(error, requestId);
   }

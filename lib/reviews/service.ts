@@ -63,7 +63,10 @@ export interface CreateReviewRunParams {
   name?: string | null;
 }
 
-export async function createReviewRunAndEnqueue(params: CreateReviewRunParams): Promise<ReviewRun> {
+export async function createReviewRunAndEnqueue(
+  params: CreateReviewRunParams,
+  opts?: { requestId?: string },
+): Promise<ReviewRun> {
   if (!isUuid(params.workspaceId)) {
     throw errors.validation("workspaceId 必须是 UUID。");
   }
@@ -129,7 +132,7 @@ export async function createReviewRunAndEnqueue(params: CreateReviewRunParams): 
     createdBy: params.userId,
   });
 
-  await enqueueReviewRun(run.id);
+  await enqueueReviewRun(run.id, { requestId: opts?.requestId });
   logger.info("已创建审核任务", {
     reviewRunId: run.id,
     workspaceId: params.workspaceId,
@@ -205,7 +208,10 @@ export interface EnqueueReviewResult {
  * 资料补齐了就想再跑一次。findings 会被整体替换（见 replaceRunFindings），
  * 因此不会出现新旧结论混在一起。
  */
-export async function enqueueReviewRun(runId: string): Promise<EnqueueReviewResult> {
+export async function enqueueReviewRun(
+  runId: string,
+  opts?: { requestId?: string },
+): Promise<EnqueueReviewResult> {
   if (!isUuid(runId)) return { queued: false, reason: "not_found" };
 
   const claimed = await claimReviewRun(runId, REVIEW_STALE_THRESHOLD_MS);
@@ -216,9 +222,13 @@ export async function enqueueReviewRun(runId: string): Promise<EnqueueReviewResu
   }
 
   // 不 await：调用方只负责排队，审核本身在串行队列里跑。
-  void runExclusive(() => executeReviewRun(claimed)).catch((error: unknown) => {
-    logger.error("审核任务异常退出", { reviewRunId: runId, error });
-  });
+  // requestId 随闭包透传进 executeReviewRun，穿透异步边界，
+  // 让后台审核任务的日志也能回溯到触发它的那次请求（HTTP 或 Server Action）。
+  void runExclusive(() => executeReviewRun(claimed, { requestId: opts?.requestId })).catch(
+    (error: unknown) => {
+      logger.error("审核任务异常退出", { reviewRunId: runId, error });
+    },
+  );
 
   return { queued: true };
 }
@@ -228,8 +238,17 @@ export async function enqueueReviewRun(runId: string): Promise<EnqueueReviewResu
 /* ------------------------------------------------------------------ */
 
 /** 真正干活的地方。**必须在串行队列中运行**（与文档解析共用同一条队列，见 lib/jobs）。 */
-export async function executeReviewRun(run: ReviewRun): Promise<void> {
-  const log = logger.child({ reviewRunId: run.id, workspaceId: run.workspaceId });
+export async function executeReviewRun(
+  run: ReviewRun,
+  opts?: { requestId?: string },
+): Promise<void> {
+  // 把入口请求带来的 requestId 合并进本任务的日志上下文，
+  // 于是审核「开始 / 完成 / 失败」的每条日志都能回溯到触发它的那次请求。
+  const log = logger.child({
+    ...(opts?.requestId ? { requestId: opts.requestId } : {}),
+    reviewRunId: run.id,
+    workspaceId: run.workspaceId,
+  });
 
   try {
     const documentIds = toStringArray(run.documentIds);
