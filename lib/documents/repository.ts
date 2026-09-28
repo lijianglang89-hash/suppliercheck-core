@@ -12,7 +12,7 @@
 
 import "server-only";
 
-import { and, asc, count, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 
 import { getDb } from "@/lib/db";
 import {
@@ -392,6 +392,148 @@ export async function finishJob(input: FinishJobInput): Promise<void> {
       updatedAt: sql`now()`,
     })
     .where(eq(documentProcessingJobs.id, input.jobId));
+}
+
+/* ------------------------------------------------------------------ */
+/* 软删除与物理回收（GC）                                               */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 软删除一行文档：写 deletedAt 并把状态置为 DELETED。
+ *
+ * 返回 false 表示目标不存在、或已经是软删状态（幂等）。
+ * 只动这一行 —— 子文档的联动是 service 层的决策，这里只提供单行原语。
+ */
+export async function softDeleteDocumentRow(documentId: string): Promise<boolean> {
+  const db = getDb();
+  const [row] = await db
+    .update(documents)
+    .set({ status: "DELETED", deletedAt: new Date(), updatedAt: new Date() })
+    .where(and(eq(documents.id, documentId), isNull(documents.deletedAt)))
+    .returning({ id: documents.id });
+  return row !== undefined;
+}
+
+/** 软删某父文档的全部未删子文档（service 层决定「删父带子」的语义）。 */
+export async function softDeleteChildDocuments(parentDocumentId: string): Promise<number> {
+  const db = getDb();
+  const rows = await db
+    .update(documents)
+    .set({ status: "DELETED", deletedAt: new Date(), updatedAt: new Date() })
+    .where(
+      and(
+        eq(documents.parentDocumentId, parentDocumentId),
+        isNull(documents.deletedAt),
+      ),
+    )
+    .returning({ id: documents.id });
+  return rows.length;
+}
+
+/**
+ * 恢复一行软删文档。状态由 service 层依据库内证据重建后传入（见 service.restoreDocument）。
+ * 返回 false 表示目标不存在或本来就未被删除。
+ */
+export async function restoreDocumentRow(
+  documentId: string,
+  status: DocumentRow["status"],
+  processingStatus: DocumentRow["processingStatus"],
+): Promise<boolean> {
+  const db = getDb();
+  const [row] = await db
+    .update(documents)
+    .set({ status, processingStatus, deletedAt: null, updatedAt: new Date() })
+    .where(and(eq(documents.id, documentId), isNotNull(documents.deletedAt)))
+    .returning({ id: documents.id });
+  return row !== undefined;
+}
+
+/** 按 id 取文档行，**包含已软删的**。恢复路径必须用它，否则软删行永远查不到。 */
+export async function findDocumentByIdIncludingDeleted(
+  documentId: string,
+): Promise<DocumentRow | undefined> {
+  const db = getDb();
+  const [row] = await db.select().from(documents).where(eq(documents.id, documentId)).limit(1);
+  return row;
+}
+
+/** 列出某父文档的全部子文档行（含已软删的），GC 清物理文件时必须覆盖软删子行。 */
+export async function listChildDocumentsIncludingDeleted(
+  parentDocumentId: string,
+): Promise<Pick<DocumentRow, "id" | "storagePath">[]> {
+  const db = getDb();
+  return db
+    .select({ id: documents.id, storagePath: documents.storagePath })
+    .from(documents)
+    .where(eq(documents.parentDocumentId, parentDocumentId));
+}
+
+/** 工作区的回收站视图：全部软删行，最近的在前。 */
+export async function listSoftDeletedDocuments(
+  workspaceId: string,
+  limit = 50,
+): Promise<
+  Pick<
+    DocumentRow,
+    "id" | "workspaceId" | "originalFilename" | "safeFilename" | "mimeType" | "size" | "parentDocumentId" | "createdAt" | "deletedAt"
+  >[]
+> {
+  const db = getDb();
+  return db
+    .select({
+      id: documents.id,
+      workspaceId: documents.workspaceId,
+      originalFilename: documents.originalFilename,
+      safeFilename: documents.safeFilename,
+      mimeType: documents.mimeType,
+      size: documents.size,
+      parentDocumentId: documents.parentDocumentId,
+      createdAt: documents.createdAt,
+      deletedAt: documents.deletedAt,
+    })
+    .from(documents)
+    .where(and(eq(documents.workspaceId, workspaceId), isNotNull(documents.deletedAt)))
+    .orderBy(desc(documents.deletedAt))
+    .limit(limit);
+}
+
+/** GC 的取数：deletedAt 早于 cutoff 的软删行。GC 是全局任务，不按工作区过滤。 */
+export async function listExpiredSoftDeletedDocuments(
+  cutoff: Date,
+  limit = 500,
+): Promise<Pick<DocumentRow, "id" | "workspaceId" | "storagePath" | "safeFilename" | "deletedAt">[]> {
+  const db = getDb();
+  return db
+    .select({
+      id: documents.id,
+      workspaceId: documents.workspaceId,
+      storagePath: documents.storagePath,
+      safeFilename: documents.safeFilename,
+      deletedAt: documents.deletedAt,
+    })
+    .from(documents)
+    .where(and(isNotNull(documents.deletedAt), lt(documents.deletedAt, cutoff)))
+    .orderBy(asc(documents.deletedAt))
+    .limit(limit);
+}
+
+/**
+ * 物理删除一行文档。
+ *
+ * FK 连带（见 lib/db/schema.ts）：
+ *   - document_texts / document_processing_jobs：cascade，正文与任务记录随之消失；
+ *   - 子文档（parentDocumentId 自引用）：cascade，子行随之消失；
+ *   - review_findings：set null，审核发现保留、报告完好 —— 这是刻意的。
+ *
+ * ⚠️ 物理文件不受 FK 约束，调用方（service 的 GC）必须先把文件删干净再调这里。
+ */
+export async function hardDeleteDocument(documentId: string): Promise<boolean> {
+  const db = getDb();
+  const [row] = await db
+    .delete(documents)
+    .where(eq(documents.id, documentId))
+    .returning({ id: documents.id });
+  return row !== undefined;
 }
 
 /** 最近一次处理任务，用于把失败原因展示给使用者。 */

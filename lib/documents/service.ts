@@ -44,9 +44,18 @@ import {
   claimDocumentForProcessing,
   createDocument,
   findDocumentById,
+  findDocumentByIdIncludingDeleted,
+  findDocumentText,
+  findLatestJob,
   finishJob,
+  hardDeleteDocument,
+  listChildDocumentsIncludingDeleted,
+  listExpiredSoftDeletedDocuments,
   markDocumentFailed,
   markDocumentReady,
+  restoreDocumentRow,
+  softDeleteChildDocuments,
+  softDeleteDocumentRow,
   startJob,
   upsertDocumentText,
 } from "./repository";
@@ -372,4 +381,158 @@ function buildParseSource(document: DocumentRow): ParseSource {
     openStream: () => storage.downloadStream(document.storagePath),
     readAll: () => storage.download(document.storagePath),
   };
+}
+
+/* ------------------------------------------------------------------ */
+/* 4. 软删除与物理回收（GC）                                            */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 软删除的保留窗口（天）。过了这个窗口的软删行由 GC 彻底清除。
+ * 这是产品承诺过的数字（界面文案「30 天内可恢复」），改动必须连 UI 文案一起改。
+ */
+export const DOCUMENT_GC_RETENTION_DAYS = 30;
+
+/**
+ * 软删除一份资料（纯数据库操作，**绝不**触碰物理文件）。
+ *
+ * 语义：「删除」的粒度是**整个资料包** —— 删父文档（压缩包）时，包内展开出的
+ * 子文档一并软删。子文档是从父包派生的副本，父包都不要了却把碎片留在列表里，
+ * 使用者只会困惑。反过来，单独删一个子文档不动父文档和兄弟。
+ *
+ * 30 天内可通过 restoreDocument 恢复；30 天后由 runDocumentGarbageCollection
+ * 彻底清除（物理文件 + 数据库记录）。
+ */
+export async function softDeleteDocument(params: {
+  workspaceId: string;
+  documentId: string;
+}): Promise<void> {
+  if (!isUuid(params.documentId)) {
+    throw errors.notFound("没有找到对应的资料。");
+  }
+
+  // findDocumentById 过滤掉软删行 —— 重复删除因此表现为 NOT_FOUND，
+  // 调用方（runIdempotentDelete）把这种情况当幂等成功处理。
+  const existing = await findDocumentById(params.documentId);
+  if (!existing || existing.workspaceId !== params.workspaceId) {
+    throw errors.notFound("没有找到对应的资料。");
+  }
+
+  await softDeleteDocumentRow(existing.id);
+  // 子文档跟着走（只连带直接子级；嵌套 zip 在上传时就被拒绝，不存在孙子级）。
+  await softDeleteChildDocuments(existing.id);
+}
+
+/**
+ * 恢复一份软删资料。状态**依据库内证据重建**，而不是凭空猜：
+ *   - document_texts 里正文还在 → 解析曾经成功 → READY / SUCCEEDED；
+ *   - 最近一次处理任务 FAILED → 解析失败 → FAILED / FAILED（恢复后 ReprocessButton 回来）；
+ *   - 其余（还没轮到解析就被删了）→ UPLOADED / PENDING。
+ *
+ * 恢复父文档时连同其全部软删子文档一起恢复 —— 软删把整包带出列表，
+ * 恢复就该把整包带回来。
+ */
+export async function restoreDocument(params: {
+  workspaceId: string;
+  documentId: string;
+}): Promise<void> {
+  if (!isUuid(params.documentId)) {
+    throw errors.notFound("没有找到对应的资料。");
+  }
+
+  // 恢复路径必须用包含软删行的查询 —— findDocumentById 会把目标滤掉。
+  const existing = await findDocumentByIdIncludingDeleted(params.documentId);
+  if (!existing || existing.workspaceId !== params.workspaceId) {
+    throw errors.notFound("没有找到对应的资料。");
+  }
+  if (existing.deletedAt === null) {
+    throw errors.validation("该资料未被删除，无需恢复。");
+  }
+
+  await restoreDocumentRow(existing.id, ...(await reconstructStatus(existing.id)));
+
+  if (existing.parentDocumentId === null) {
+    const children = await listChildDocumentsIncludingDeleted(existing.id);
+    for (const child of children) {
+      await restoreDocumentRow(child.id, ...(await reconstructStatus(child.id)));
+    }
+  }
+}
+
+/** 从正文与任务记录里重建一份文档的生命周期状态。 */
+async function reconstructStatus(
+  documentId: string,
+): Promise<[DocumentRow["status"], DocumentRow["processingStatus"]]> {
+  const [text, job] = await Promise.all([findDocumentText(documentId), findLatestJob(documentId)]);
+  if (text) return ["READY", "SUCCEEDED"];
+  if (job?.status === "FAILED") return ["FAILED", "FAILED"];
+  return ["UPLOADED", "PENDING"];
+}
+
+export interface GarbageCollectionResult {
+  /** 扫描到的过期软删行数。 */
+  scanned: number;
+  /** 完成「物理文件 + 数据库记录」双清的行数。 */
+  deleted: number;
+  /** 物理删除失败被跳过、留待下次重试的行数。 */
+  skipped: number;
+}
+
+/**
+ * 物理回收：把软删超过 DOCUMENT_GC_RETENTION_DAYS 天的资料彻底清除。
+ *
+ * 顺序纪律（对应「物理文件确认移除后再执行 DB DELETE」）：
+ *   1. storage.delete(物理文件) —— 本地实现的 rm 带 force，文件已不存在**不算错误**，
+ *      所以这一步 resolve 就意味着「文件已确认不在磁盘上」；
+ *   2. 子文档的物理文件一并删 —— 父文档硬删时 FK cascade 会带走子文档的库行，
+ *      但物理文件不受 FK 约束，不在这里显式删就会留下查不到主的孤儿文件；
+ *   3. hardDeleteDocument —— cascade 清掉正文、任务记录与子行；review_findings
+ *      被 set null，审核报告完好。
+ *
+ * 容错：任何一步物理删除失败（真实 IO 故障，不是「文件已不在」）就跳过这一行、
+ * 计入 skipped，下次运行重试。部分文件已删的情况天然幂等 —— 已删的文件
+ * 下次 storage.delete 照样 resolve。宁可让记录多留 30 天，也不制造
+ * 「库行没了、磁盘上还有一份查不到主的文件」的悬空状态。
+ *
+ * 触发：/api/cron/gc（CRON_SECRET 鉴权），由外部定时器按天调用。
+ */
+export async function runDocumentGarbageCollection(options?: {
+  now?: Date;
+}): Promise<GarbageCollectionResult> {
+  const now = options?.now ?? new Date();
+  const cutoff = new Date(now.getTime() - DOCUMENT_GC_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+
+  const rows = await listExpiredSoftDeletedDocuments(cutoff);
+  const storage = getStorageProvider();
+
+  let deleted = 0;
+  let skipped = 0;
+
+  for (const row of rows) {
+    try {
+      await storage.delete(row.storagePath);
+
+      const children = await listChildDocumentsIncludingDeleted(row.id);
+      for (const child of children) {
+        await storage.delete(child.storagePath);
+      }
+
+      await hardDeleteDocument(row.id);
+      deleted += 1;
+      logger.info("GC 已彻底清除过期软删文档", {
+        documentId: row.id,
+        workspaceId: row.workspaceId,
+        childCount: children.length,
+      });
+    } catch (error) {
+      skipped += 1;
+      logger.error("GC 清除文档失败，留待下次重试", {
+        documentId: row.id,
+        storagePath: row.storagePath,
+        error,
+      });
+    }
+  }
+
+  return { scanned: rows.length, deleted, skipped };
 }

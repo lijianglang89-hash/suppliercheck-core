@@ -31,6 +31,15 @@ export const serverEnvSchema = z.object({
   /** 会话 Cookie 的 HMAC 签名密钥，至少 32 字符。 */
   SESSION_SECRET: z.string().min(32, "SESSION_SECRET 至少需要 32 个字符"),
 
+  /**
+   * 定时清理接口 /api/cron/gc 的鉴权密钥（Authorization: Bearer <CRON_SECRET>）。
+   *
+   * 可选：未配置时该路由**整体停用**（返回 404，不暴露端点存在）；
+   * 一旦配置，所有未携带或携带错误密钥的请求一律拒绝。
+   * 比较使用 timingSafeEqual，请求耗时与密钥内容无关。
+   */
+  CRON_SECRET: z.string().min(32, "CRON_SECRET 至少需要 32 个字符").optional(),
+
   AI_PROVIDER: z.enum(AI_PROVIDER_IDS).default("mock"),
   AI_API_KEY: z.string().optional(),
   AI_MODEL: z.string().optional(),

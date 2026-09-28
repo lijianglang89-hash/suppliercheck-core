@@ -3,12 +3,14 @@ import Link from "next/link";
 import { AutoRefresh } from "@/components/documents/auto-refresh";
 import { ReprocessButton } from "@/components/documents/reprocess-button";
 import { DocumentUploader } from "@/components/documents/uploader";
+import { ConfirmSubmitButton } from "@/components/ui/confirm-submit-button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Icon, type IconName } from "@/components/ui/icons";
+import { deleteDocumentAction, restoreDocumentAction } from "@/app/actions/documents";
 import { requireUser, requireWorkspaceAccess } from "@/lib/auth/guards";
 import { ensureWorkspaceForUser } from "@/lib/auth/workspaces";
 import { getEnv } from "@/lib/config/server-env";
-import { listWorkspaceDocuments } from "@/lib/documents/repository";
+import { listSoftDeletedDocuments, listWorkspaceDocuments } from "@/lib/documents/repository";
 import {
   STATUS_TONE_CLASS,
   documentStatusLabel,
@@ -38,8 +40,9 @@ export default async function DocumentsPage() {
     minimumRole: "VIEWER",
   });
 
-  const [rows, suppliers] = await Promise.all([
+  const [rows, deletedRows, suppliers] = await Promise.all([
     listWorkspaceDocuments(authorized.id),
+    listSoftDeletedDocuments(authorized.id),
     listWorkspaceSuppliers(authorized.id, { includeArchived: true }),
   ]);
   const env = getEnv();
@@ -227,6 +230,15 @@ export default async function DocumentsPage() {
                             </Link>
                           ) : null}
                           {row.status === "FAILED" && <ReprocessButton documentId={row.id} />}
+                          <form action={deleteDocumentAction}>
+                            <input type="hidden" name="documentId" value={row.id} />
+                            <ConfirmSubmitButton
+                              variant="danger"
+                              message="确定删除这份资料吗？30 天内可以在页面下方恢复，超过 30 天将被彻底清除。"
+                            >
+                              删除
+                            </ConfirmSubmitButton>
+                          </form>
                         </div>
                       </td>
                     </tr>
@@ -237,6 +249,66 @@ export default async function DocumentsPage() {
           </div>
         )}
       </section>
+
+      {/*
+        回收站：软删 30 天内可恢复，超过窗口由 /api/cron/gc 彻底清除。
+        只在确实有软删行时渲染 —— 平时这个区块不存在，不打扰正常流程。
+      */}
+      {deletedRows.length > 0 && (
+        <section aria-labelledby="trash-heading" className="card">
+          <div className="flex items-center justify-between border-b border-ink-100 px-5 py-3">
+            <div>
+              <h2 id="trash-heading" className="text-sm font-semibold text-ink-900">
+                已删除资料
+              </h2>
+              <p className="mt-0.5 text-xs text-ink-500">
+                删除的资料在这里保留 30 天，可随时恢复；超过 30 天将被彻底清除，无法找回。
+              </p>
+            </div>
+            <span className="text-xs text-ink-500">最多显示 50 条</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] border-collapse text-sm">
+              <thead>
+                <tr className="border-b border-ink-100 text-left text-xs uppercase tracking-wide text-ink-500">
+                  <th className="px-5 py-2 font-medium">文件名</th>
+                  <th className="px-3 py-2 font-medium">类型</th>
+                  <th className="px-3 py-2 font-medium">大小</th>
+                  <th className="px-3 py-2 font-medium">删除时间</th>
+                  <th className="px-5 py-2 font-medium">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {deletedRows.map((row) => (
+                  <tr key={row.id} className="border-b border-ink-100 last:border-b-0 align-top">
+                    <td className="max-w-[280px] px-5 py-3">
+                      <span className="block truncate font-medium text-ink-700" title={row.originalFilename}>
+                        {row.safeFilename}
+                      </span>
+                      {row.parentDocumentId && (
+                        <span className="mt-0.5 block text-xs text-ink-400">来自压缩包</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-3 text-ink-600">{mimeTypeLabel(row.mimeType)}</td>
+                    <td className="px-3 py-3 text-ink-600">{formatBytes(row.size)}</td>
+                    <td className="px-3 py-3 text-xs text-ink-600">
+                      {row.deletedAt?.toLocaleString("zh-CN", { hour12: false })}
+                    </td>
+                    <td className="px-5 py-3">
+                      <form action={restoreDocumentAction}>
+                        <input type="hidden" name="documentId" value={row.id} />
+                        <ConfirmSubmitButton message={`确定恢复「${row.safeFilename}」吗？`}>
+                          恢复
+                        </ConfirmSubmitButton>
+                      </form>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       <section className="card rounded-lg px-5 py-4 text-xs leading-relaxed text-ink-600">
         <h2 className="text-sm font-semibold text-ink-900">关于解析能力的说明</h2>
