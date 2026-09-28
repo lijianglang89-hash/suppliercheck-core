@@ -14,15 +14,19 @@ import Link from "next/link";
 
 import { SAMPLE_REPORT } from "@/lib/content/sample-report";
 import { CATEGORY_LABELS, CATEGORY_ORDER } from "@/lib/reviews/labels";
-import { REVIEW_RULES } from "@/lib/reviews/rules";
+import { REVIEW_RULES, RULE_BY_ID } from "@/lib/reviews/rules";
 import { isBlocking, type FindingCategory } from "@/lib/reviews/types";
 import {
   BoundaryPanel,
   CheckFanout,
+  DocumentPane,
   FailurePanel,
+  FindingsPane,
   RuleEvidenceFinding,
+  SeverityBadge,
   StateStrip,
   StorageDiagram,
+  WorkspaceMetrics,
 } from "@/components/landing/visuals";
 import { Icon, type IconName } from "@/components/ui/icons";
 import { Reveal } from "@/components/ui/reveal";
@@ -193,61 +197,9 @@ export function BeforeAfterSection() {
  * 由 tests/unit/brand-assets.test.ts 守着。
  */
 /**
- * 五个维度的「典型情况」。
- *
- * ⚠️ 这些句子是**示意**，不是承诺：某个维度不一定每次都出问题，
- * 也可能出别的问题。它们的作用是让人看懂这个维度在查什么。
+ * 五个维度的逐维度数据由 `buildCheckGroups` / `CATEGORY_HEADLINES` 提供，
+ * 供下方 CheckFanout 总览使用（由 `REVIEW_RULES` 现算，不写死）。
  */
-const CAPABILITIES: ReadonlyArray<{
-  title: string;
-  category: FindingCategory;
-  detail: string;
-  samples: readonly { text: string; status: "fail" | "warn" }[];
-}> = [
-  {
-    title: "资料完整性",
-    category: "COMPLETENESS",
-    detail: "对照审核模板检查必填项，直接列出缺什么。",
-    samples: [
-      { text: "缺少必备资料：检测报告", status: "fail" },
-      { text: "缺少必备资料：开户资料", status: "fail" },
-    ],
-  },
-  {
-    title: "正文可用性",
-    category: "READABILITY",
-    detail: "扫不出正文、还是占位模板、是否被截断，都会如实提示而不是跳过。",
-    samples: [
-      { text: "扫描件无文字层，未参与审核", status: "warn" },
-      { text: "存在未填写的占位内容", status: "fail" },
-    ],
-  },
-  {
-    title: "主体与身份",
-    category: "ENTITY",
-    detail: "按 GB 32100 校验统一社会信用代码，并比对各文件里的主体是否一致。",
-    samples: [
-      { text: "统一社会信用代码校验位错误", status: "fail" },
-      { text: "出现多个不同主体代码", status: "warn" },
-    ],
-  },
-  {
-    title: "证照有效期",
-    category: "VALIDITY",
-    detail: "检查营业执照与资质证书是否过期或临期；写成「长期」的按长期处理。",
-    samples: [
-      { text: "证照即将到期（模板阈值内）", status: "warn" },
-      { text: "有效期无法判定", status: "warn" },
-      { text: "证照已过期", status: "fail" },
-    ],
-  },
-  {
-    title: "数据一致性",
-    category: "CONSISTENCY",
-    detail: "比对报价单与合同等文件中的金额大小写是否自洽。",
-    samples: [{ text: "金额大小写不一致", status: "warn" }],
-  },
-];
 
 /**
  * 「五类检查」的总览图。
@@ -270,14 +222,29 @@ function buildCheckGroups() {
  * 与报告区（左文右 UI）交错，阅读线形成 Z 字流转，化解长页疲劳。
  * 维度内容全部来自 CAPABILITIES（真实分类，不是编的「财务合规/法律履约」）。
  */
+/**
+ * 大型产品展示区（P0 重构）：删掉「小卡 + 大留白」，改为与 Hero 同级的宽幅工作台。
+ *
+ * 为什么铺满主内容区：窄栏里的文件状态机、严重级别、原文摘录全挤成一条线，
+ * 读不出"这是个真软件"。这里把工作台铺满（≥100% of max-w-6xl，远超 75% 阈值）：
+ * 左 = 资料清单（UPLOADED / PROCESSING / READY / FAILED 四个真实状态都摆出来），
+ * 右 = 审核结果（按严重级别排序，每条带 RULE + EVIDENCE）。
+ * 五类检查能力用下方 CheckFanout 一句话总览收口，不再各自占一张大卡。
+ */
+const CAPABILITY_DEMO_DOCUMENTS = [
+  { name: "营业执照.pdf", ext: "pdf", state: "READY" },
+  { name: "ISO9001 证书.pdf", ext: "pdf", state: "READY" },
+  { name: "报价单.xlsx", ext: "xlsx", state: "READY" },
+  { name: "检测报告.pdf", ext: "pdf", state: "PROCESSING" },
+  { name: "开户许可证扫描件.pdf", ext: "pdf", state: "FAILED" },
+  { name: "商务条款.docx", ext: "docx", state: "UPLOADED" },
+] as const;
+
 export function CapabilitiesSection() {
   const checkGroups = buildCheckGroups();
-  /**
-   * 示意的"本次结果"：五个维度分别有没有查出要看的点。
-   * 刻意不统一成一个颜色 —— 五个维度同时全绿反而说明图是画出来的。
-   * 取值用 clear/review/action（"有无发现"），不是 pass/fail（"是否合格"）。
-   */
   const demoStatus = ["action", "review", "review", "review", "clear"] as const;
+  const blockingCount = SAMPLE_REPORT.findings.filter((finding) => isBlocking(finding.severity))
+    .length;
 
   return (
     <section
@@ -285,95 +252,266 @@ export function CapabilitiesSection() {
       aria-labelledby="capabilities-heading"
       className="scroll-mt-16 border-b border-ink-200 bg-white"
     >
-      <div className="mx-auto w-full max-w-6xl px-6 py-24 lg:py-28">
-        <div className="grid items-center gap-14 lg:grid-cols-2 lg:gap-12">
-          {/* 左 50%：CheckFanout 视觉（弥散光背板） */}
-          <Reveal className="relative order-2 lg:order-1" delayMs={120}>
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute -inset-5 rounded-3xl bg-brand-500/10 blur-2xl"
-            />
-            <div className="relative">
-              <CheckFanout
-                groups={checkGroups.map((group, index) => ({
-                  label: group.label,
-                  count: group.count,
-                  status: demoStatus[index],
-                  headline: CATEGORY_HEADLINES[group.category],
-                  ...CATEGORY_ICONS[group.category],
-                }))}
-              />
-              <p className="mt-2 text-[11px] leading-5 text-ink-500">
-                每个维度的规则条数取自当前已上线的规则集；图中状态为一次示意性审核的结果，不代表任何真实资料。
-              </p>
+      <div className="mx-auto w-full max-w-6xl px-6 py-16 lg:py-24">
+        <Reveal>
+          <span className="inline-flex items-center gap-2 rounded-full border border-ink-200 bg-ink-50 px-3 py-1 text-xs font-medium text-ink-600">
+            <Icon name="template" className="h-3.5 w-3.5" />
+            五类检查，一次跑完
+          </span>
+          <h2
+            id="capabilities-heading"
+            className="mt-5 text-[clamp(1.75rem,3vw,2.5rem)] font-bold leading-[1.2] tracking-tight text-ink-900"
+          >
+            一份资料包进去，
+            <br className="hidden sm:block" />
+            <span className="text-brand-700">五个维度</span>各跑各的规则
+          </h2>
+          <p className="mt-4 max-w-3xl text-sm leading-7 text-ink-600">
+            最后汇总成一份报告。审核结论全部由规则产出：同一份资料跑两次，结果一致。
+          </p>
+        </Reveal>
+
+        {/* 大型工作台：铺满主内容区，左资料状态机 + 右审核结果（含 RULE） */}
+        <Reveal className="mt-10" delayMs={120}>
+          <div className="overflow-hidden rounded-lg border border-ink-200 bg-white shadow-[0_16px_40px_rgba(23,44,70,0.10)]">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-ink-100 px-4 py-3">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-brand-600/10 text-brand-700">
+                  <Icon name="building" className="h-4 w-4" />
+                </span>
+                <span className="truncate text-sm font-semibold text-ink-900">
+                  {SAMPLE_REPORT.supplierName}
+                </span>
+                <span className="shrink-0 rounded bg-brand-600/10 px-1.5 py-0.5 text-[10px] font-medium text-brand-700">
+                  审核完成
+                </span>
+              </div>
+              <span className="shrink-0 text-[10px] tabular-nums text-ink-400">
+                {SAMPLE_REPORT.templateName} · 基准日 {SAMPLE_REPORT.baseDate}
+              </span>
             </div>
-          </Reveal>
 
-          {/* 右 50%：标题 + 五个真实维度紧凑列表 */}
-          <Reveal className="order-1 lg:order-2">
-            <span className="inline-flex items-center gap-2 rounded-full border border-ink-200 bg-ink-50 px-3 py-1 text-xs font-medium text-ink-600">
-              <Icon name="template" className="h-3.5 w-3.5" />
-              五类检查，一次跑完
-            </span>
+            <WorkspaceMetrics
+              documentCount={SAMPLE_REPORT.documentCount}
+              readableDocumentCount={SAMPLE_REPORT.readableDocumentCount}
+              totalCharacters={SAMPLE_REPORT.totalCharacters}
+              ruleCount={REVIEW_RULES.length}
+              findingCount={SAMPLE_REPORT.findings.length}
+              blockingCount={blockingCount}
+            />
 
-            <h2
-              id="capabilities-heading"
-              className="mt-5 text-[clamp(1.75rem,3vw,2.5rem)] font-bold leading-[1.2] tracking-tight text-ink-900"
-            >
-              一份资料包进去，
-              <br className="hidden sm:block" />
-              <span className="text-brand-700">五个维度</span>各跑各的规则
-            </h2>
+            <div className="grid gap-4 p-4 lg:grid-cols-5">
+              <div className="min-w-0 lg:col-span-2">
+                <DocumentPane files={CAPABILITY_DEMO_DOCUMENTS} />
+              </div>
+              <div className="min-w-0 lg:col-span-3">
+                <FindingsPane findings={SAMPLE_REPORT.findings} showRule />
+              </div>
+            </div>
 
-            <p className="mt-4 text-sm leading-7 text-ink-600">
-              最后汇总成一份报告。审核结论全部由规则产出：同一份资料跑两次，结果一致。
-            </p>
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-ink-100 bg-ink-50/60 px-4 py-2.5">
+              <span className="text-[11px] leading-5 text-ink-500">
+                示例数据 · 文件状态（上传 / 解析中 / 可查看 / 失败）为示意，公司名与内容均为虚构
+              </span>
+              <Link
+                href="/sample-report"
+                className="shrink-0 text-[11px] font-medium text-brand-700 hover:text-brand-800"
+              >
+                查看完整示例报告 →
+              </Link>
+            </div>
+          </div>
+        </Reveal>
 
-            <ul className="mt-8 space-y-5">
-              {CAPABILITIES.map((item) => (
-                <li key={item.title} className="flex gap-3.5">
-                  <span
-                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${CATEGORY_ICONS[item.category].tone}`}
-                    aria-hidden="true"
-                  >
-                    <Icon name={CATEGORY_ICONS[item.category].icon} className="h-5 w-5" />
+        {/* 五类检查一句话总览：保留能力维度信息，但不各自占大卡 */}
+        <Reveal className="mt-8" delayMs={160}>
+          <CheckFanout
+            groups={checkGroups.map((group, index) => ({
+              label: group.label,
+              count: group.count,
+              status: demoStatus[index],
+              headline: CATEGORY_HEADLINES[group.category],
+              ...CATEGORY_ICONS[group.category],
+            }))}
+          />
+          <p className="mt-2 text-[11px] leading-5 text-ink-500">
+            每个维度的规则条数取自当前已上线的规则集；图中状态为一次示意性审核的结果，不代表任何真实资料。
+          </p>
+        </Reveal>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * 深色品牌断点（P1 #47）：Workflow 与 Capabilities 之间的第二视觉高潮。
+ *
+ * 中段一路白 / 浅之后，用一整块深底把「从资料包到可复核结果」的链路一次性亮出来。
+ * 这是产品最值钱的承诺 —— 不是形容词，是五步真实链路。
+ *
+ * 纪律（同 RulesSection 深色块）：半透明白描边、语义色只做幽灵徽章、底部大 padding 当隔离带。
+ */
+const BRAND_PIPELINE: ReadonlyArray<{ tag: string; title: string; detail: string }> = [
+  { tag: "UPLOAD", title: "上传资料包", detail: "PDF / Word / Excel / 图片 / ZIP 一次传入" },
+  { tag: "EXTRACT", title: "提取正文", detail: "解析文件，取可核对文本" },
+  { tag: "RULE", title: "规则校验", detail: "按启用模板逐条比对" },
+  { tag: "EVIDENCE", title: "附上证据", detail: "所在资料 + 原文摘录" },
+  { tag: "FINDING", title: "产出发现", detail: "严重级别 + 建议，可复核" },
+];
+
+export function BrandBreakSection() {
+  return (
+    <section
+      id="brand-break"
+      aria-labelledby="brand-break-heading"
+      className="scroll-mt-16 bg-brand-900 py-24 pb-28 lg:py-28 lg:pb-32"
+    >
+      <div className="mx-auto w-full max-w-6xl px-6">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-200">企智审</p>
+        <h2
+          id="brand-break-heading"
+          className="mt-4 text-[clamp(1.75rem,3.5vw,2.75rem)] font-bold leading-[1.2] tracking-tight text-white"
+        >
+          从一份资料包，到一份可复核的审核结果。
+        </h2>
+
+        <ol className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          {BRAND_PIPELINE.map((step, index) => (
+            <li key={step.tag}>
+              <div className="h-full rounded-lg border border-white/10 bg-white/5 p-4">
+                <div className="flex items-center gap-2">
+                  <span className="rounded bg-white/15 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-white">
+                    {step.tag}
                   </span>
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-baseline gap-x-2">
-                      <h3 className="text-sm font-semibold text-ink-900">{item.title}</h3>
-                      <span className="text-xs tabular-nums text-ink-400">
-                        {CATEGORY_HEADLINES[item.category]}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-sm leading-6 text-ink-600">{item.detail}</p>
-                    <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5">
-                      {item.samples.map((sample) => (
-                        <li key={sample.text} className="flex items-center gap-1.5 text-xs text-ink-500">
-                          {/*
-                            只有两种色：danger / warning。
-                            原来还有个 success 绿的分支，但没有任何一条 sample 会走到它，
-                            是死代码 —— 而且绿色圆点会被读成"这一项通过了"。
-                          */}
-                          <span
-                            className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                              sample.status === "fail" ? "bg-danger-600" : "bg-warning-600"
-                            }`}
-                            aria-hidden="true"
-                          />
-                          {sample.text}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </li>
-              ))}
-            </ul>
+                  {index < BRAND_PIPELINE.length - 1 && (
+                    <span
+                      aria-hidden="true"
+                      className="ml-auto hidden text-[11px] text-white/40 lg:block"
+                    >
+                      →
+                    </span>
+                  )}
+                </div>
+                <p className="mt-2.5 text-sm font-semibold text-white">{step.title}</p>
+                <p className="mt-1 text-[11px] leading-5 text-white/60">{step.detail}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
 
-            <p className="mt-6 text-xs leading-5 text-ink-500">
-              上列为各维度的典型情况示意，用于说明这一维度在查什么，不构成审核承诺。
+        <p className="mt-10 border-t border-white/10 pt-6 text-xs leading-6 text-white/50">
+          每一步都可回看：资料状态、命中的规则、原文摘录，都在报告里逐项对应，不靠一句「系统判断」。
+        </p>
+      </div>
+    </section>
+  );
+}
+
+/** 链路节点之间的连接箭头。窄屏竖排时转向下。 */
+function PipelineArrow() {
+  return (
+    <div className="flex items-center justify-center text-ink-300" aria-hidden="true">
+      <span className="rotate-90 text-lg leading-none lg:rotate-0">→</span>
+    </div>
+  );
+}
+
+/**
+ * 「企智审审核示例」入口（P1 #49）：非客户案例，明确标注示例数据。
+ *
+ * 不做客户背书、不虚构企业：只把一条真实发现拆成 RULE → EVIDENCE → FINDING，
+ * 让访客在不上传资料的情况下判断"查得准不准"。完整版导向 /sample-report。
+ */
+const EXAMPLE_FINDING = SAMPLE_REPORT.findings.find(
+  (finding) => finding.ruleId === "CERTIFICATE_EXPIRED",
+)!;
+
+export function ReviewExampleSection() {
+  const rule = RULE_BY_ID.get(EXAMPLE_FINDING.ruleId);
+
+  return (
+    <section
+      id="review-example"
+      aria-labelledby="review-example-heading"
+      className="scroll-mt-16 border-b border-ink-200 bg-band"
+    >
+      <div className="mx-auto w-full max-w-6xl px-6 py-16 lg:py-20">
+        <Reveal>
+          <span className="inline-flex items-center gap-2 rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700">
+            <Icon name="file-check" className="h-3.5 w-3.5" />
+            企智审审核示例 · 演示数据
+          </span>
+          <h2
+            id="review-example-heading"
+            className="mt-5 text-[clamp(1.75rem,3vw,2.5rem)] font-bold leading-[1.2] tracking-tight text-ink-900"
+          >
+            一条发现，三样东西都对得上
+          </h2>
+          <p className="mt-4 max-w-2xl text-sm leading-7 text-ink-600">
+            下面不是客户案例，而是示例报告里的一条真实发现 —— 不指向任何真实企业。
+            它演示了企智审如何把「规则 → 证据 → 结论」绑定在一起。
+          </p>
+        </Reveal>
+
+        <Reveal className="mt-10" delayMs={120}>
+          <div className="card p-6 lg:p-8">
+            <div className="flex flex-wrap items-baseline justify-between gap-3">
+              <p className="text-sm font-semibold text-ink-900">示例发现 · {SAMPLE_REPORT.supplierName}</p>
+              <p className="text-xs text-ink-500">判定基准日 {SAMPLE_REPORT.baseDate}</p>
+            </div>
+
+            <div className="mt-6 grid items-stretch gap-3 lg:grid-cols-[1fr_auto_1fr_auto_1fr]">
+              {/* RULE */}
+              <div className="rounded-lg border border-ink-200 bg-white p-4">
+                <p className="font-mono text-[10px] font-semibold tracking-wider text-brand-700">
+                  ① RULE
+                </p>
+                <p className="mt-2 font-mono text-[11px] text-ink-500">{EXAMPLE_FINDING.ruleId}</p>
+                <p className="mt-1 text-sm font-semibold text-ink-900">{rule?.label}</p>
+                <p className="mt-2 text-xs leading-5 text-ink-600">{rule?.description}</p>
+              </div>
+
+              <PipelineArrow />
+
+              {/* EVIDENCE */}
+              <div className="rounded-lg border border-ink-200 bg-white p-4">
+                <p className="font-mono text-[10px] font-semibold tracking-wider text-brand-700">
+                  ② EVIDENCE
+                </p>
+                <p className="mt-2 text-xs font-medium text-ink-500">所在资料</p>
+                <p className="text-sm font-medium text-ink-900">{EXAMPLE_FINDING.documentLabel}</p>
+                <p className="mt-3 text-xs font-medium text-ink-500">原文摘录</p>
+                <p className="mt-1 rounded bg-ink-50 px-2 py-1.5 font-mono text-[11px] leading-5 text-ink-800">
+                  {EXAMPLE_FINDING.evidence}
+                </p>
+              </div>
+
+              <PipelineArrow />
+
+              {/* FINDING */}
+              <div className="rounded-lg border border-ink-200 bg-white p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-mono text-[10px] font-semibold tracking-wider text-brand-700">
+                    ③ FINDING
+                  </p>
+                  <SeverityBadge severity={EXAMPLE_FINDING.severity} />
+                </div>
+                <p className="mt-2 text-sm font-semibold text-ink-900">{EXAMPLE_FINDING.title}</p>
+                <p className="mt-2 text-xs leading-5 text-ink-600">{EXAMPLE_FINDING.detail}</p>
+              </div>
+            </div>
+
+            <p className="mt-6 border-t border-ink-100 pt-4 text-xs leading-5 text-ink-500">
+              示例数据（主体名、日期、金额均为虚构），不代表任何真实审核结果。
+              <Link
+                href="/sample-report"
+                className="ml-1 font-medium text-brand-700 hover:underline"
+              >
+                查看完整示例报告 →
+              </Link>
             </p>
-          </Reveal>
-        </div>
+          </div>
+        </Reveal>
       </div>
     </section>
   );
@@ -435,7 +573,7 @@ export function RulesSection() {
           不是一句「系统判断」，是 {REVIEW_RULES.length} 条写明的规则
         </h2>
         <p className="mt-4 max-w-2xl text-sm leading-7 text-white/70">
-          每条规则检查什么、什么情况下标记「问题」、什么情况下不下结论，都在下面列着。
+          企智审的审核结论由这些规则逐条产出：每条规则检查什么、什么情况下标记「问题」、什么情况下不下结论，都在下面列着。
           规则清单也是你可以自己关掉的：在审核模板里不勾选的规则不会出现在任何结论里。
         </p>
 

@@ -31,7 +31,16 @@ const VIEWPORTS = [
 ];
 
 /** 必须可达且非空的区块锚点。改版新增/删除区块时同步这里。 */
-const ANCHORS = ["scenarios", "workflow", "evidence", "rules", "capabilities", "trust"];
+const ANCHORS = [
+  "scenarios",
+  "workflow",
+  "evidence",
+  "rules",
+  "brand-break",
+  "capabilities",
+  "review-example",
+  "trust",
+];
 
 /**
  * 逐项结论禁用词。系统只产出发现、不产出通过/不通过，

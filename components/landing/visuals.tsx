@@ -287,14 +287,21 @@ export function WorkspaceMetrics({
 function FindingItem({
   finding,
   dense = false,
+  showRule = false,
 }: {
   finding: SampleFinding;
   dense?: boolean;
+  showRule?: boolean;
 }) {
   return (
     <li className="flex items-start gap-2.5 px-3 py-2.5">
       <SeverityBadge severity={finding.severity} />
       <div className="min-w-0 flex-1">
+        {showRule && finding.ruleId && (
+          <span className="mb-1 inline-flex w-fit rounded bg-brand-600/10 px-1.5 py-0.5 font-mono text-[10px] font-medium text-brand-700">
+            {finding.ruleId}
+          </span>
+        )}
         <p className="text-xs font-medium leading-5 text-ink-900">{finding.title}</p>
         {!dense && (
           <p className="mt-0.5 text-[11px] leading-5 text-ink-500">{finding.detail}</p>
@@ -447,7 +454,13 @@ export function DocumentPane({
  * 不是「CRITICAL / HIGH」生硬堆砌 —— 但级别徽章保留英文枚举的对应关系，
  * 因为客户在自己那份报告里看到的就是这套词。
  */
-export function FindingsPane({ findings }: { findings: readonly SampleFinding[] }) {
+export function FindingsPane({
+  findings,
+  showRule = false,
+}: {
+  findings: readonly SampleFinding[];
+  showRule?: boolean;
+}) {
   const sorted = [...findings].sort(
     (a, b) => SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity],
   );
@@ -460,7 +473,7 @@ export function FindingsPane({ findings }: { findings: readonly SampleFinding[] 
       </div>
       <ul className="flex-1 divide-y divide-ink-100">
         {sorted.map((finding) => (
-          <FindingItem key={finding.id} finding={finding} />
+          <FindingItem key={finding.id} finding={finding} showRule={showRule} />
         ))}
       </ul>
     </div>

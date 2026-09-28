@@ -10,9 +10,11 @@ import { TrustCenterSection } from "@/components/landing/trust-center-section";
 import {
   BeforeAfterSection,
   BoundarySection,
+  BrandBreakSection,
   CapabilitiesSection,
   FinalCtaSection,
   MetricsSection,
+  ReviewExampleSection,
   RulesSection,
   SecuritySection,
   WorkflowSection,
@@ -133,7 +135,7 @@ export default function HomePage() {
                   SEO 的实体名与品牌记忆各拿到一次曝光。
                 */}
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-600">
-                  {siteConfig.name}
+                  企智审 · {siteConfig.name}
                 </p>
                 {/*
                   标题刻意不写「交给 AI」。
@@ -247,8 +249,10 @@ export default function HomePage() {
             流程        —— 我用起来要几步？
             证据链      —— 它凭什么这么说？（第一处视觉高潮，浅色）
             报告        —— 我最后拿到什么？
-            能力清单    —— 我的文件它认不认？
-            规则引擎    —— 它的判断依据写在哪？（第二处高潮，深色）
+            品牌断点    —— 从资料包到可复核结果，五步真实链路（第二处高潮，深色）
+            能力清单    —— 我的文件它认不认？（大型工作台展示，与 Hero 同级）
+            规则引擎    —— 它的判断依据写在哪？（深色）
+            审核示例    —— 不上传也能看懂它查得准不准（示例数据，非客户案例）
             边界        —— 它不做什么？
             资料怎么保管 —— 我的东西安全吗？
             信任中心    —— 上面这些我能自己核对吗？
@@ -263,8 +267,10 @@ export default function HomePage() {
         <WorkflowSection />
         <EvidenceChainSection />
         <ReportSection />
+        <BrandBreakSection />
         <CapabilitiesSection />
         <RulesSection />
+        <ReviewExampleSection />
         <BoundarySection />
         <SecuritySection />
         <TrustCenterSection />

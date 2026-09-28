@@ -92,7 +92,7 @@ export function TrustCenterSection() {
           只写你能自己核对的
         </h2>
         <p className="mt-4 max-w-2xl text-sm leading-6 text-ink-600">
-          下面每一条都附了一句「你怎么验证」。写不出验证方式的，就不该出现在这一区。
+          企智审只写你能自己核对的东西：下面每一条都附了一句「你怎么验证」。写不出验证方式的，就不该出现在这一区。
         </p>
 
         <ul className="mt-10 grid gap-5 lg:grid-cols-2">
