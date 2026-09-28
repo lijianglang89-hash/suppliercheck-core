@@ -300,6 +300,74 @@ export async function markDocumentFailed(documentId: string): Promise<void> {
     .where(eq(documents.id, documentId));
 }
 
+/**
+ * 把「僵死」的解析中文档批量打回 FAILED，返回被收走的文档 id。
+ *
+ * 判定与 claimDocumentForProcessing 的 stale 重认领**同一把标尺**
+ * （status=PROCESSING 且 updatedAt 早于阈值）：手动重跑能抢回来的，
+ * 自动扫尾也能收走 —— 两套语义绝不各定一个数字。
+ *
+ * 条件 UPDATE（而非先查后改）保证幂等且不误杀：
+ * updatedAt 在任务真正执行时被刷新，健康任务永远不满足 `updatedAt < staleBefore`。
+ */
+export async function failStaleProcessingDocuments(staleBefore: Date): Promise<string[]> {
+  const db = getDb();
+  const rows = await db
+    .update(documents)
+    .set({ status: "FAILED", processingStatus: "FAILED", updatedAt: new Date() })
+    .where(
+      and(
+        eq(documents.status, "PROCESSING"),
+        isNull(documents.deletedAt),
+        lt(documents.updatedAt, staleBefore),
+      ),
+    )
+    .returning({ id: documents.id });
+  return rows.map((row) => row.id);
+}
+
+export interface FailedStaleJob {
+  id: string;
+  documentId: string;
+  jobType: string;
+}
+
+/**
+ * 把僵死的 RUNNING 任务行（含解析与压缩包展开）批量收尾为 FAILED。
+ *
+ * documents.status 与 jobs.status 是两条独立的状态线：进程被杀时两者都可能
+ * 永远停在 RUNNING。文档行由 failStaleProcessingDocuments 收走，这里收任务行，
+ * 两边用同一个 cutoff。job 行残留 RUNNING 的实际危害在恢复路径：
+ * reconstructStatus 会把「正文缺失 + 最近任务 RUNNING」的文档重建为 UPLOADED。
+ */
+export async function failStaleRunningJobs(
+  staleBefore: Date,
+  errorCode: string,
+  errorMessage: string,
+): Promise<FailedStaleJob[]> {
+  const db = getDb();
+  return db
+    .update(documentProcessingJobs)
+    .set({
+      status: "FAILED",
+      errorCode,
+      errorMessage,
+      finishedAt: sql`now()`,
+      updatedAt: sql`now()`,
+    })
+    .where(
+      and(
+        eq(documentProcessingJobs.status, "RUNNING"),
+        lt(documentProcessingJobs.startedAt, staleBefore),
+      ),
+    )
+    .returning({
+      id: documentProcessingJobs.id,
+      documentId: documentProcessingJobs.documentId,
+      jobType: documentProcessingJobs.jobType,
+    });
+}
+
 export interface UpsertDocumentTextInput {
   workspaceId: string;
   documentId: string;

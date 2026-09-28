@@ -20,7 +20,7 @@ import "server-only";
 
 import type { Readable } from "node:stream";
 
-import { errors, toAppError } from "@/lib/errors";
+import { ERROR_CODES, errors, toAppError } from "@/lib/errors";
 import {
   buildStorageKey,
   isUuid,
@@ -34,7 +34,12 @@ import { getStorageProvider } from "@/lib/storage";
 
 import type { DocumentRow } from "@/lib/db/schema";
 
-import { MAX_ERROR_MESSAGE_CHARS, PARSE_TIMEOUT_MS, STALE_JOB_THRESHOLD_MS } from "./limits";
+import {
+  MAX_ERROR_MESSAGE_CHARS,
+  PARSE_TIMEOUT_MS,
+  STALE_JOB_THRESHOLD_MS,
+  STUCK_JOB_ERROR_MESSAGE,
+} from "./limits";
 import type { InspectionTransform } from "./inspect-stream";
 import { selectParser } from "./parsers/registry";
 import type { ParseSource } from "./parsers/types";
@@ -43,6 +48,8 @@ import { runExclusive, withTimeout } from "./queue";
 import {
   claimDocumentForProcessing,
   createDocument,
+  failStaleProcessingDocuments,
+  failStaleRunningJobs,
   findDocumentById,
   findDocumentByIdIncludingDeleted,
   findDocumentText,
@@ -556,4 +563,54 @@ export async function runDocumentGarbageCollection(options?: {
   }
 
   return { scanned: rows.length, deleted, skipped };
+}
+
+/* ------------------------------------------------------------------ */
+/* 5. 僵尸任务扫尾（sweep）                                              */
+/* ------------------------------------------------------------------ */
+
+export interface StuckDocumentSweepResult {
+  /** 被打回 FAILED 的文档数。 */
+  documents: number;
+  /** 被收尾的 RUNNING 任务行数（含解析与压缩包展开）。 */
+  jobs: number;
+}
+
+/**
+ * 把僵死的解析任务静默收尾：文档 PROCESSING → FAILED，任务行 RUNNING → FAILED。
+ *
+ * 物理事实：单容器部署下 OOM / 服务器重启会让 status 永远停在 PROCESSING，
+ * 使用者看到的是「永远转圈」且无法重试。stale claim 已允许**手动**重跑抢回
+ * 僵死任务，本函数是同一把标尺下的**自动**收尾（触发：/api/cron/gc）。
+ *
+ * 与排队中正常任务的竞态是良性的：任务已过判定线但仍排在串行队列里时，
+ * sweep 可能先标 FAILED，随后任务照常执行并以真实结果覆盖状态 ——
+ * 单任务被 withTimeout 硬性兜底在 2 分钟内，远小于 10 分钟判定线，
+ * 生产单容器队列几乎不可能积压出这个窗口，且最终状态永远由真实执行写定。
+ *
+ * UPLOADED 不在扫尾范围：它本就允许用户直接重跑（claim 认领条件包含它），
+ * 不存在「卡死」。
+ */
+export async function sweepStuckDocuments(options?: {
+  now?: Date;
+}): Promise<StuckDocumentSweepResult> {
+  const now = options?.now ?? new Date();
+  const staleBefore = new Date(now.getTime() - STALE_JOB_THRESHOLD_MS);
+
+  const documentIds = await failStaleProcessingDocuments(staleBefore);
+  const jobs = await failStaleRunningJobs(
+    staleBefore,
+    ERROR_CODES.INTERNAL_ERROR,
+    STUCK_JOB_ERROR_MESSAGE,
+  );
+
+  if (documentIds.length > 0 || jobs.length > 0) {
+    logger.warn("扫尾：僵死解析任务已打回 FAILED", {
+      documents: documentIds.length,
+      jobs: jobs.length,
+      documentIds,
+    });
+  }
+
+  return { documents: documentIds.length, jobs: jobs.length };
 }

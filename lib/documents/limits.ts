@@ -114,4 +114,4 @@ export const PARSE_TIMEOUT_MS = 120_000;
  * 它们是进程级约定，文档解析与审核引擎必须用同一套值。
  * 这里 re-export 是为了保持既有 import 不变。
  */
-export { MAX_ERROR_MESSAGE_CHARS, STALE_JOB_THRESHOLD_MS } from "@/lib/jobs/limits";
+export { MAX_ERROR_MESSAGE_CHARS, STALE_JOB_THRESHOLD_MS, STUCK_JOB_ERROR_MESSAGE } from "@/lib/jobs/limits";

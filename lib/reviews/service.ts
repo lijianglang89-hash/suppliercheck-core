@@ -18,11 +18,11 @@
  */
 import "server-only";
 
-import { errors, toAppError } from "@/lib/errors";
+import { ERROR_CODES, errors, toAppError } from "@/lib/errors";
 import { isUuid } from "@/lib/files";
 import { getAIProvider } from "@/lib/ai";
 import { logger } from "@/lib/logger";
-import { MAX_ERROR_MESSAGE_CHARS } from "@/lib/jobs/limits";
+import { MAX_ERROR_MESSAGE_CHARS, STUCK_JOB_ERROR_MESSAGE } from "@/lib/jobs/limits";
 import { runExclusive, withTimeout } from "@/lib/jobs/serial-queue";
 import { listDocumentsWithText, type DocumentWithTextRow } from "@/lib/documents/repository";
 import { findSuppliersByIds } from "@/lib/suppliers/repository";
@@ -42,6 +42,7 @@ import {
 import {
   claimReviewRun,
   createReviewRun,
+  failStaleRunningReviewRuns,
   findReviewRunById,
   markReviewRunFailed,
   markReviewRunReady,
@@ -324,6 +325,39 @@ export async function executeReviewRun(
 /** 允许重新运行一个已完成任务（供服务端调用，不做授权 —— 授权在调用方）。 */
 export async function rerunReview(runId: string): Promise<EnqueueReviewResult> {
   return enqueueReviewRun(runId);
+}
+
+/* ------------------------------------------------------------------ */
+/* 僵尸任务扫尾（sweep）                                                */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 把僵死的审核任务静默收尾：RUNNING → FAILED（带「系统中断」文案）。
+ *
+ * 物理事实：进程被 OOM / 重启杀掉时，已认领（RUNNING）的任务永远不会有人来
+ * 写终态，使用者的界面就永远转圈。claimReviewRun 的 stale 重认领允许**手动**
+ * 重跑抢回，本函数是同一把标尺下的**自动**收尾（触发：/api/cron/gc）。
+ *
+ * 判定安全性：单次执行被 withTimeout(REVIEW_TIMEOUT_MS=60s) 硬性兜底，
+ * RUNNING 超过 5 分钟只可能是进程死亡；良性竞态的分析见
+ * documents/service.sweepStuckDocuments（同一套论证，阈值更宽裕）。
+ * QUEUED 不在扫尾范围：任务尚未开跑，且用户随时可以手动重跑（claim 认 QUEUED）。
+ */
+export async function sweepStuckReviewRuns(options?: { now?: Date }): Promise<number> {
+  const now = options?.now ?? new Date();
+  const staleBefore = new Date(now.getTime() - REVIEW_STALE_THRESHOLD_MS);
+
+  const runIds = await failStaleRunningReviewRuns(
+    staleBefore,
+    ERROR_CODES.INTERNAL_ERROR,
+    STUCK_JOB_ERROR_MESSAGE,
+  );
+
+  if (runIds.length > 0) {
+    logger.warn("扫尾：僵死审核任务已打回 FAILED", { reviewRunIds: runIds });
+  }
+
+  return runIds.length;
 }
 
 /* ------------------------------------------------------------------ */

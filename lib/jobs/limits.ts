@@ -18,3 +18,11 @@ export const MAX_ERROR_MESSAGE_CHARS = 500;
  * 允许被重新认领，避免任务永远卡在运行中。
  */
 export const STALE_JOB_THRESHOLD_MS = 10 * 60 * 1000;
+
+/**
+ * 僵尸任务被扫尾（sweep）打回 FAILED 时落库的用户文案。
+ *
+ * 解析与审核两类任务共用同一句 —— 同类失败出现两套说法，
+ * 只会让使用者怀疑这是两种不同的故障。
+ */
+export const STUCK_JOB_ERROR_MESSAGE = "系统中断或处理超时，请重新发起。";

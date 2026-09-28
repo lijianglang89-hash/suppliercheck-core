@@ -147,6 +147,40 @@ export async function markReviewRunFailed(
     .where(eq(reviewRuns.id, runId));
 }
 
+/**
+ * 把「僵死」的审核任务批量打回 FAILED，返回被收走的 run id。
+ *
+ * 判定与 claimReviewRun 的 stale 重认领**同一把标尺**（status=RUNNING 且
+ * updatedAt 早于阈值）。正常运行被 withTimeout(REVIEW_TIMEOUT_MS=60s) 硬性兜底，
+ * RUNNING 超过 5 分钟只可能是进程死亡（OOM / 容器重启 / kill）。
+ * 条件 UPDATE 保证幂等且不误杀健康任务。
+ */
+export async function failStaleRunningReviewRuns(
+  staleBefore: Date,
+  errorCode: string,
+  errorMessage: string,
+): Promise<string[]> {
+  const db = getDb();
+  const rows = await db
+    .update(reviewRuns)
+    .set({
+      status: "FAILED",
+      errorCode,
+      errorMessage,
+      finishedAt: sql`now()`,
+      updatedAt: sql`now()`,
+    })
+    .where(
+      and(
+        eq(reviewRuns.status, "RUNNING"),
+        isNull(reviewRuns.deletedAt),
+        lt(reviewRuns.updatedAt, staleBefore),
+      ),
+    )
+    .returning({ id: reviewRuns.id });
+  return rows.map((row) => row.id);
+}
+
 export async function softDeleteReviewRun(runId: string): Promise<void> {
   const db = getDb();
   await db
