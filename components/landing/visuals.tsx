@@ -18,15 +18,28 @@ import { REVIEW_RULES } from "@/lib/reviews/rules";
 import { isBlocking, SEVERITY_RANK, type Severity } from "@/lib/reviews/types";
 import { Icon, type IconName } from "@/components/ui/icons";
 
-type Status = "pass" | "warn" | "fail";
+/**
+ * 维度级状态。**注意措辞**：这里描述的是"这一维度本次有没有查出需要看的点"，
+ * 不是"资料是否合格"—— 所以一律用**动作提示 + 无发现**，
+ * 不写「通过 / 待确认 / 问题」这类逐项结论（docs/DESIGN.md §0 硬规则 1：
+ * 系统只输出发现，从不输出「通过」）。
+ *
+ * 枚举名也不叫 `pass`：叫 `clear` 是"本次没命中规则"这个事实，
+ * 而不是"判定为通过"。名字会诱导后来者把文案写回「通过」。
+ *
+ * 配色同理：`clear` 刻意**不用 success 绿** —— 绿徽章在这一屏会被读成"通过"，
+ * 改用中性灰，让它看起来只是"没有东西要处理"。
+ */
+type CheckStatus = "clear" | "review" | "action";
 
-const STATUS_STYLE: Record<Status, { label: string; className: string }> = {
-  pass: { label: "通过", className: "bg-success-600/10 text-success-600" },
-  warn: { label: "待确认", className: "bg-warning-600/10 text-warning-600" },
-  fail: { label: "问题", className: "bg-danger-600/10 text-danger-600" },
+/** 导出给单测：这一层文案是被硬规则约束的，必须能被守卫盯住。 */
+export const STATUS_STYLE: Record<CheckStatus, { label: string; className: string }> = {
+  clear: { label: "无发现", className: "bg-ink-100 text-ink-600" },
+  review: { label: "需确认", className: "bg-warning-600/10 text-warning-600" },
+  action: { label: "需处理", className: "bg-danger-600/10 text-danger-600" },
 };
 
-export function StatusPill({ status }: { status: Status }) {
+export function StatusPill({ status }: { status: CheckStatus }) {
   const style = STATUS_STYLE[status];
   return (
     <span
@@ -53,7 +66,7 @@ export function CheckFanout({
   groups: readonly {
     label: string;
     count: number;
-    status: Status;
+    status: CheckStatus;
     headline: string;
     icon: IconName;
     tone: string;
@@ -334,7 +347,11 @@ export function ReviewWorkspacePreview({ limit = 5 }: { limit?: number }) {
           <span className="truncate text-sm font-semibold text-ink-900">
             {SAMPLE_REPORT.supplierName}
           </span>
-          <span className="shrink-0 rounded bg-success-600/10 px-1.5 py-0.5 text-[10px] font-medium text-success-600">
+          {/*
+            「审核完成」说的是**流程跑完了**，不是"这份资料通过了" ——
+            所以底色用品牌蓝而非 success 绿（绿徽章紧跟公司名，会被读成合格标记）。
+          */}
+          <span className="shrink-0 rounded bg-brand-600/10 px-1.5 py-0.5 text-[10px] font-medium text-brand-700">
             审核完成
           </span>
         </div>
@@ -558,17 +575,22 @@ export function BoundaryPanel() {
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
+      {/*
+        标题必须带主语。「可以确定」单看会被读成"这份资料可以确定（没问题）"，
+        而它真正说的主语是**系统**：这一类信息系统能给出确定答案。
+        配色也一并收窄：绿色对勾只用于"确实能给出答案"，不用来暗示资料合格。
+      */}
       <div className="rounded-lg border border-ink-200 bg-white p-4">
         <div className="flex items-center gap-2">
-          <span className="flex h-6 w-6 items-center justify-center rounded bg-success-600/10 text-success-600">
+          <span className="flex h-6 w-6 items-center justify-center rounded bg-brand-600/10 text-brand-700">
             <Icon name="check" className="h-3.5 w-3.5" />
           </span>
-          <h3 className="text-sm font-semibold text-ink-900">可以确定</h3>
+          <h3 className="text-sm font-semibold text-ink-900">系统能确定的</h3>
         </div>
         <ul className="mt-3 space-y-2">
           {canDetermine.map((item) => (
             <li key={item} className="flex gap-2 text-xs leading-6 text-ink-700">
-              <span aria-hidden="true" className="text-success-600">
+              <span aria-hidden="true" className="text-brand-600">
                 ✓
               </span>
               {item}

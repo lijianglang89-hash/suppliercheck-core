@@ -15,7 +15,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:check": "drizzle-kit check",
-    "db:seed": "tsx db/seed.ts"
+    "db:seed": "tsx db/seed.ts",
+    "qa:visual": "node scripts/qa/visual-audit.mjs"
   },
   "dependencies": {
     "busboy": "^1.6.0",

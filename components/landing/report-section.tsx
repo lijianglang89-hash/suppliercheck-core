@@ -72,7 +72,8 @@ export function ReportSection() {
                 <span className="truncate text-sm font-semibold text-ink-900">
                   {SAMPLE_REPORT.supplierName}
                 </span>
-                <span className="shrink-0 rounded bg-success-600/10 px-1.5 py-0.5 text-[10px] font-medium text-success-600">
+                {/* 「审核完成」= 流程跑完了，不是"资料合格"，所以不用 success 绿。 */}
+                <span className="shrink-0 rounded bg-brand-600/10 px-1.5 py-0.5 text-[10px] font-medium text-brand-700">
                   审核完成
                 </span>
               </div>
@@ -90,11 +91,19 @@ export function ReportSection() {
               blockingCount={blockingCount}
             />
 
+            {/*
+              min-w-0 是必需的，不是装饰：
+              grid item 默认 min-width:auto —— 窄屏单列时，轨道会被内容的
+              min-content 宽度顶开（实测 390 视口下撑到 382px，而可用宽度只有 308px），
+              父级的 overflow-hidden 再把多出来的部分直接裁掉，
+              表现为"没有横向滚动条，但右侧内容缺一块"。
+              加了 min-w-0 之后轨道才允许被压到 0，交给内部的 truncate 去省略。
+            */}
             <div className="grid gap-4 p-4 lg:grid-cols-5">
-              <div className="lg:col-span-2">
+              <div className="min-w-0 lg:col-span-2">
                 <DocumentPane files={SAMPLE_REPORT.documents} />
               </div>
-              <div className="lg:col-span-3">
+              <div className="min-w-0 lg:col-span-3">
                 <FindingsPane findings={SAMPLE_REPORT.findings} />
               </div>
             </div>

@@ -68,7 +68,7 @@ export const CHECKLIST_TEMPLATES: readonly ChecklistTemplate[] = [
     updatedAt: "2026-09-27",
     intro: [
       "这份清单解决三件事：向供应商要求哪些资料、每份资料验到什么程度、验出问题怎么定性。",
-      "它不是模板下载站里那种「资料目录」，每一条都对应一条可执行的核对动作 —— 也是供应商智审在审核时实际执行的规则。",
+      "它不是模板下载站里那种「资料目录」，每一条都对应一条可执行的核对动作 —— 也是企智审在审核时实际执行的规则。",
     ],
     builtinTemplateKey: "supplier-onboarding",
     items: [

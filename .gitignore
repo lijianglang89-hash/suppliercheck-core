@@ -14,7 +14,9 @@
 /coverage
 
 # next.js
-/.next/
+# 用 /.next*/ 而不是 /.next/ —— 本机构建排障时会 `mv .next .next.stale-<ts>`，
+# 那些残留同样是构建产物，不能进版本库。
+/.next*/
 /out/
 
 # production
@@ -71,3 +73,6 @@ docs/screenshots/
 .workbuddy/seo-profile/
 *-state.json
 suppliercheck-review-pack-*.zip
+
+# 品牌资产生成过程中的人工目检对照图（脚本每次重跑都会重出）
+docs/brand/_*

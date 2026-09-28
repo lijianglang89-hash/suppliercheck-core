@@ -26,8 +26,8 @@ export const metadata: Metadata = {
   description: siteConfig.description,
   applicationName: siteConfig.name,
   keywords: [
-    "供应商智审",
-    "SupplierCheck",
+    "企智审",
+    "企业供应商智能审核平台",
     "供应商资料审核",
     "供应商资质审核",
     "采购合规",

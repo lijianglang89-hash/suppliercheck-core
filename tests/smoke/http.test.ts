@@ -36,8 +36,10 @@ if (!BASE_URL) {
       expect(response.status).toBe(200);
 
       const html = await response.text();
-      expect(html).toContain("供应商智审");
-      expect(html).toContain("AI 自动审核供应商资料");
+      expect(html).toContain("企智审");
+      // 首屏副标题里必须出现「确定性审核规则」—— 这是本产品与"AI 帮你看看"的分界线，
+      // 断它不只是文案回归，是在守住「不把规则包装成 AI」这条对外口径。
+      expect(html).toContain("确定性审核规则");
       // 服务端渲染：正文必须出现在 HTML 里，而不是靠客户端 JS 注入
       expect(html).toContain("常见问题");
     });

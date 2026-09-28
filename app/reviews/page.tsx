@@ -172,7 +172,13 @@ export default async function ReviewsPage({
                       </span>
                     ))}
                     {Object.keys(counts).length === 0 && run.status === "READY" ? (
-                      <span className="text-success-600">未发现问题</span>
+                      /*
+                        这里刻意不写「未发现问题」，也不用 success 绿。
+                        规则零命中是一个**可复算的事实**（15 条规则一条都没触发），
+                        不是「这家供应商合格」—— 绿色 + 「未发现问题」读起来就是后者。
+                        「0 条发现」与同一行的「严重 2 / 高 3」是同一套语言，不构成判定。
+                      */
+                      <span className="text-ink-500">0 条发现</span>
                     ) : null}
                   </div>
                 </li>
@@ -195,6 +201,12 @@ export default async function ReviewsPage({
           </li>
           <li>
             未提取到正文的扫描件不参与审核，并会在结论里明确列出 —— 覆盖了多少资料，报告里写得清清楚楚。
+          </li>
+          <li>
+            <span className="text-ink-900">规则零命中不等于供应商合格。</span>
+            规则只覆盖它能查的维度（资料齐不齐、证照过没过期、代码对不对、金额自不自洽），
+            资质挂靠、证件真伪、履约能力这些它查不了 —— 那些要人工核实。
+            所以列表上写的是「0 条发现」，不是「通过」。
           </li>
           <li>
             图片附件目前需要人工查看原文件；共 {formatBytes(documents.reduce((sum, row) => sum + row.size, 0))} 的资料存放在私有目录，

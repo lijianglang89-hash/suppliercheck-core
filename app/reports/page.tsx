@@ -102,8 +102,9 @@ export default async function ReportsPage() {
                       </span>
                     ))}
                     {Object.keys(counts).length === 0 ? (
-                      <span className="rounded bg-ink-100 px-2 py-0.5 text-xs font-medium text-success-600">
-                        未发现问题
+                      /* 「0 条发现」而不是「未发现问题」+ 绿底：后者读起来像"这家供应商通过了"。 */
+                      <span className="rounded bg-ink-100 px-2 py-0.5 text-xs font-medium text-ink-600">
+                        0 条发现
                       </span>
                     ) : null}
                   </div>

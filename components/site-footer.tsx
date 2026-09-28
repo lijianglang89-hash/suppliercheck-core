@@ -108,7 +108,7 @@ export function SiteFooter() {
       <div className="border-t border-ink-100">
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-2 px-6 py-4 text-xs text-ink-400 sm:flex-row sm:items-center sm:justify-between">
           <p className="flex flex-wrap items-center gap-2">
-            <span>© {year} {siteConfig.name}（{siteConfig.latinName}）</span>
+            <span>© {year} {siteConfig.name}</span>
             <Link href="/templates" className="text-ink-500 hover:text-brand-700">
               资料核验清单
             </Link>

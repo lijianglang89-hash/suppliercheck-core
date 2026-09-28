@@ -11,7 +11,7 @@ import { logger } from "@/lib/logger";
 
 export const metadata: Metadata = {
   title: "登录",
-  description: "登录供应商智审，管理你的供应商资料审核工作区。",
+  description: "登录企智审，管理你的供应商资料审核工作区。",
   alternates: { canonical: "/login" },
   /**
    * 登录页不参与搜索排名：页面只有一个表单，对搜索用户没有价值，
@@ -48,7 +48,7 @@ export default async function LoginPage(props: PageProps<"/login">) {
       <SiteHeader />
       <main id="main" className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-6 py-16">
         <h1 className="text-2xl font-semibold tracking-tight text-ink-900">登录</h1>
-        <p className="mt-2 text-sm text-ink-600">使用邮箱和密码登录你的供应商智审账号。</p>
+        <p className="mt-2 text-sm text-ink-600">使用邮箱和密码登录你的企智审账号。</p>
 
         <div className="mt-8 card p-6">
           <AuthForm mode="login" action={loginAction} nextPath={nextParam ? nextPath : undefined} />

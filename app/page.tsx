@@ -3,7 +3,10 @@ import Link from "next/link";
 
 import { ReviewWorkspacePreview } from "@/components/landing/visuals";
 import { ContentHubSection } from "@/components/landing/content-hub-section";
+import { EvidenceChainSection } from "@/components/landing/evidence-chain-section";
 import { ReportSection } from "@/components/landing/report-section";
+import { ScenariosSection } from "@/components/landing/scenarios-section";
+import { TrustCenterSection } from "@/components/landing/trust-center-section";
 import {
   BeforeAfterSection,
   BoundarySection,
@@ -29,9 +32,9 @@ export const metadata: Metadata = {
 
 const FAQS: ReadonlyArray<{ question: string; answer: string }> = [
   {
-    question: "供应商智审是做什么的？",
+    question: "企智审是做什么的？",
     answer:
-      "供应商智审（SupplierCheck）是一个在线工具：上传供应商资料包后，系统自动识别文件、提取关键信息，检查资料完整性、证照有效期以及主体信息与产品资质的一致性，最后生成审核报告。",
+      "企智审（企业供应商智能审核平台）是一个在线工具：上传供应商资料包后，系统自动识别文件、提取关键信息，检查资料完整性、证照有效期以及主体信息与产品资质的一致性，最后生成审核报告。",
   },
   {
     question: "支持哪些文件格式？",
@@ -73,7 +76,7 @@ export default function HomePage() {
       {
         "@type": "SoftwareApplication",
         name: siteConfig.name,
-        alternateName: siteConfig.latinName,
+        alternateName: siteConfig.shortName,
         applicationCategory: "BusinessApplication",
         operatingSystem: "Web",
         description: siteConfig.description,
@@ -124,8 +127,13 @@ export default function HomePage() {
             <div className="grid items-center gap-12 lg:grid-cols-12 lg:gap-10">
               {/* 左：40% */}
               <div className="lg:col-span-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-600">
-                  {siteConfig.latinName}
+                {/*
+                  Hero 的眉标放**全称**而不是简称：这一屏是着陆页里权重最高的位置，
+                  全称「企业供应商智能审核平台」在这里出现一次，
+                  SEO 的实体名与品牌记忆各拿到一次曝光。
+                */}
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-600">
+                  {siteConfig.name}
                 </p>
                 {/*
                   标题刻意不写「交给 AI」。
@@ -154,6 +162,18 @@ export default function HomePage() {
                   上传一份供应商 PDF 或 ZIP 资料包，系统自动展开压缩包、提取正文，
                   执行 {REVIEW_RULES.length} 条确定性审核规则，把需要关注的问题集中列出来。
                 </p>
+
+                {/* 受众自认领：让对应岗位的人第一眼确认「这说的是我」。取自 siteConfig，不另写一份。 */}
+                <ul className="mt-5 flex flex-wrap gap-1.5">
+                  {siteConfig.audience.map((item) => (
+                    <li
+                      key={item}
+                      className="rounded-full border border-ink-200 bg-ink-50 px-2.5 py-1 text-xs text-ink-600"
+                    >
+                      {item}
+                    </li>
+                  ))}
+                </ul>
 
                 <div className="mt-9 flex flex-wrap items-center gap-3">
                   <Link
@@ -218,14 +238,36 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/*
+          区块顺序 = 访客的提问顺序，不是功能清单顺序：
+
+            数字条      —— 这东西有多大？（真实规则数与维度，不含估算）
+            对比        —— 它替我改掉了什么？
+            业务场景    —— 说的是不是我？（四种岗位认领）
+            流程        —— 我用起来要几步？
+            证据链      —— 它凭什么这么说？（第一处视觉高潮，浅色）
+            报告        —— 我最后拿到什么？
+            能力清单    —— 我的文件它认不认？
+            规则引擎    —— 它的判断依据写在哪？（第二处高潮，深色）
+            边界        —— 它不做什么？
+            资料怎么保管 —— 我的东西安全吗？
+            信任中心    —— 上面这些我能自己核对吗？
+            FAQ / 内容 / CTA
+
+          底色按 白 / 浅蓝 / 浅灰 交替（见各 Section 自己的类名），
+          相邻两段不同色，读者才有"翻页"感。
+        */}
         <MetricsSection />
+        <BeforeAfterSection />
+        <ScenariosSection />
         <WorkflowSection />
+        <EvidenceChainSection />
         <ReportSection />
         <CapabilitiesSection />
         <RulesSection />
         <BoundarySection />
-        <BeforeAfterSection />
         <SecuritySection />
+        <TrustCenterSection />
 
         {/* FAQ：用 <details> 折叠，内容仍在 HTML 里，不损害 SEO 与 GEO。 */}
         <section aria-labelledby="faq-heading" className="bg-white">

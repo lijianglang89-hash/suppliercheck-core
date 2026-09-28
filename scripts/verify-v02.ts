@@ -61,8 +61,11 @@ const KEEP = process.argv.includes("--keep");
  * 刻意用纯 ASCII：合成 PDF 夹具放不了中文（原因见
  * tests/helpers/document-fixtures.ts 的 buildMinimalPdf 说明）。
  * 真实中文 PDF 的提取能力由 tests/manual/real-pdf-probe.test.ts 单独验证。
+ *
+ * 文案里不再带品牌名：品牌已改中文（企智审），而这里必须是 ASCII；
+ * 写一个「缩写版品牌」只会让后来的人以为它是正式名称。
  */
-const PDF_MARKER = "SupplierCheck V0.2 E2E probe";
+const PDF_MARKER = "E2E probe V0.2 document text";
 
 const sql = postgres(DATABASE_URL, { max: 2 });
 const runId = randomUUID().slice(0, 8);

@@ -1,5 +1,5 @@
 /**
- * 供应商智审 · 数据模型（V0.1）
+ * 企智审 · 数据模型（V0.1）
  *
  * 三条硬约束贯穿本文件：
  * 1. 多租户隔离：所有业务表都必须带 workspace_id，授权一律在服务端校验。
@@ -15,7 +15,6 @@ import {
   jsonb,
   pgEnum,
   pgTable,
-  real,
   text,
   timestamp,
   uniqueIndex,

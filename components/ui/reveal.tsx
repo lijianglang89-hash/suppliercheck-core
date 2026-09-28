@@ -26,13 +26,23 @@ export function Reveal({
   children,
   className = "",
   delayMs = 0,
+  as: Tag = "div",
 }: {
   children: ReactNode;
   className?: string;
   /** 级联延迟（毫秒）。同一区块内的多个元素错开入场，比齐刷刷一起动更有层次。 */
   delayMs?: number;
+  /**
+   * 渲染成什么标签。**在列表里必须传 `as="li"`。**
+   *
+   * 默认渲染 `<div>`，于是 `<ul>{items.map(() => <Reveal><li>…</li></Reveal>)}</ul>`
+   * 会产出 `<ul><div><li>` —— 非法嵌套：浏览器照样渲染，所以没人会发现，
+   * 但列表语义已经断了（读屏软件不再按「N 项中的第 M 项」报读）。
+   * 这种错在视觉复查里永远查不出来，只能从用法上堵住。
+   */
+  as?: "div" | "li";
 }) {
-  const ref = useRef<HTMLDivElement>(null);
+  const ref = useRef<HTMLElement>(null);
   const [visible, setVisible] = useState(true);
 
   useEffect(() => {
@@ -56,14 +66,14 @@ export function Reveal({
   }, []);
 
   return (
-    <div
-      ref={ref}
+    <Tag
+      ref={ref as never}
       style={delayMs > 0 ? { transitionDelay: `${delayMs}ms` } : undefined}
       className={`transition-all duration-700 ease-out motion-reduce:transition-none motion-reduce:translate-none ${
         visible ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
       } ${className}`}
     >
       {children}
-    </div>
+    </Tag>
   );
 }

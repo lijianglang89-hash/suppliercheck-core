@@ -13,17 +13,30 @@
   --font-mono:
     ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
 
-  /* 品牌主色：沉稳的深蓝，符合企业采购/合规场景的信任感 */
-  --color-brand-50: #f2f6fb;
-  --color-brand-100: #e2ecf7;
-  --color-brand-200: #c5d9ee;
-  --color-brand-300: #9bbde0;
-  --color-brand-400: #6a99cc;
-  --color-brand-500: #457bb4;
-  --color-brand-600: #2f6097;
-  --color-brand-700: #274e7b;
-  --color-brand-800: #1f3d60;
-  --color-brand-900: #172c46;
+  /*
+   * 品牌主色 —— 与 LOGO 同源，锚点由 James 指定（2026-09-28），并交叉验证：
+   *   品牌蓝   #0068F8  ↔ LOGO 六边形主调实测 #0766EA（一致，指定值略亮）
+   *   深海军蓝 #0B2149  ↔ LOGO 字标深蓝实测 #062151（一致，G 同为 33）
+   *   青绿对勾 #26D5A8  ↔ LOGO 对勾青绿区间 #10CDBB~#3BE3AD（指定值取更克制的品牌规范值）
+   * 这三个是权威锚点，其余色阶围绕它们插值生成。
+   * 换色必须回到这三锚点，不可另起炉灶 —— 旧色板 #2f6097 曾因与标志不同源而同屏穿帮。
+   */
+  --color-brand-50: #eef3ff;
+  --color-brand-100: #dbe7ff;
+  --color-brand-200: #b8d0ff;
+  --color-brand-300: #8ab2ff;
+  --color-brand-400: #4d8eff;
+  --color-brand-500: #0068F8; /* 品牌蓝锚点：标题高亮、图标、链接 */
+  --color-brand-600: #0060e6; /* 按钮主色（锚点略深一档，hover 用） */
+  --color-brand-700: #004bb5; /* 深色文字 / 描边 */
+  --color-brand-800: #0a3a8c;
+  --color-brand-900: #0B2149; /* 深海军蓝锚点：深色区背景（规则引擎）+ 最深字标 */
+  /* 青绿强调色：只作品牌装饰与「已完成/已核对」的正向提示，
+     不参与审核发现（finding）的严重级别配色，避免语义打架。 */
+  --color-accent-300: #9bead6;
+  --color-accent-400: #5fe0c4;
+  --color-accent-500: #26D5A8; /* 青绿对勾锚点 */
+  --color-accent-600: #19b893;
 
   /* 中性色阶 */
   --color-ink-50: #f7f8f9;
@@ -39,19 +52,19 @@
 
   /* 语义色 */
   /* 浅蓝产品展示区底色：用于放产品 UI 的区块，让白卡片从页面里浮起来 */
-  --color-brand-tint: #edf4fa;
+  --color-brand-tint: #ebf3fe;
   /* 更浅的蓝灰：用于文件卡、流程节点的底 */
-  --color-brand-mist: #f2f6f9;
+  --color-brand-mist: #f3f7fd;
 
   /* 应用画布底色：比 ink-50 深一档。
      白卡片（#fff）与画布的明度差必须肉眼可辨，卡片才能"浮"在页面上 ——
      之前 #f7f8f9 vs #fff 明度差不足 6%，整页看起来是平的。 */
-  --color-canvas: #eef1f5;
+  --color-canvas: #edf1f7;
 
   /* 落地页色带：浅蓝与浅灰两档，用于「白 / 浅蓝 / 白 / 浅灰」纵向交替。
      原来落地页只用了 ink-50（#f7f8f9），浅到看不出去，整页像一张白纸长卷。 */
-  --color-band: #f4f7fb;
-  --color-band-alt: #eef1f5;
+  --color-band: #f4f8fd;
+  --color-band-alt: #edf1f7;
 
   --color-success-600: #1f7a4d;
   --color-warning-600: #a35a06;

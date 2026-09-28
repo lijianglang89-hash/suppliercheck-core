@@ -8,7 +8,10 @@ const eslintConfig = defineConfig([
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:
-    ".next/**",
+    // 用 .next*/ 而不是 .next/ —— 本机构建会因为缓存停滞，
+    // 排障时用 `mv .next .next.stale-<ts>` 把旧缓存挪走（不能用 rm，会被删除守卫拦），
+    // 那些 .next.stale-* 同样是构建产物，不该进 lint（实测误扫出 16900 个问题）。
+    ".next*/**",
     "out/**",
     "build/**",
     "next-env.d.ts",

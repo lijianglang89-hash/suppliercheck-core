@@ -190,7 +190,7 @@ export default function SampleReportPage() {
 
             <footer className="mt-6 border-t border-ink-200 pt-4 text-xs leading-relaxed text-ink-500">
               <p>
-                以上由 {siteConfig.name}（{siteConfig.latinName}）按确定性规则生成；AI
+                以上由 {siteConfig.name}按确定性规则生成；AI
                 复核未启用（当前为开发模拟 Provider，不产生真实判断）。
               </p>
               <p className="mt-1">

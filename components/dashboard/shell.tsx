@@ -23,14 +23,12 @@ export function DashboardShell({ user, workspace, children }: DashboardShellProp
       <aside className="border-b border-ink-200 bg-white lg:w-64 lg:shrink-0 lg:border-b-0 lg:border-r">
         <div className="flex min-h-16 items-center border-b border-ink-100 px-5 py-3">
           <a href="/dashboard" className="flex items-center gap-2.5">
-            <LogoMark className="h-7 w-7 shrink-0 text-brand-700" />
+            <LogoMark className="h-7 w-7 shrink-0" />
             <span className="block">
               <span className="block text-[15px] font-semibold leading-snug tracking-tight text-ink-900">
                 {siteConfig.name}
               </span>
-              <span className="mt-0.5 block text-[11px] text-ink-400">
-                {siteConfig.latinName} · 供应商资料审核
-              </span>
+              <span className="mt-0.5 block text-[11px] text-ink-400">供应商资料审核</span>
             </span>
           </a>
         </div>

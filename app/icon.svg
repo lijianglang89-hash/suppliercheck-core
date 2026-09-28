@@ -1,24 +1,60 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="供应商智审">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="企智审 企业供应商智能审核平台">
   <!--
-    站点图标（favicon）。
-    图形语义：一份文件 + 右下角一枚"判定"徽章 ——
-    这个产品做的是"逐条核对后给出可追溯的判定"，不是泛泛的安全盾。
-    深蓝底保证 16px 下仍可辨；徽章用白底蓝勾，与底色形成二次对比。
+    站点图标（favicon）—— 品牌标志的**矢量孪生**。
+
+    为什么不用 public/brand/mark-transparent-512.png 直接出 32×32：
+    位图缩到 16~32px 会把文档折角、白线、盾牌厚度全糊成一团；
+    矢量版在标签页尺寸下仍然边缘锐利。
+
+    与位图的分工（别把两者搞混）：
+      - 位图 = 主标志，页面里显示（components/brand/logo.tsx 用 next/image 加载）；
+      - 本文件 = 浏览器标签页/书签专用，几何按位图重画，配色取实测值。
+    两者不同源会导致「标签页的蓝和页面的蓝不一样」，所以颜色写在这里、
+    与 app/globals.css 的 --color-brand-600 / --color-accent-500 保持一致。
+
+    图形语义（与主标志同构）：蓝六边形底座 + 白色盾牌 + 文档 + 青绿对勾
+    —— 资料被逐条核对后落定，一眼可读。不做"泛泛的安全盾"。
   -->
-  <rect width="32" height="32" rx="7" fill="#2f6097" />
-  <g fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M7.5 5h8l4 4v18h-12z" />
-    <path d="M15.5 5v4h4" />
-    <path d="M11 14h6" />
-    <path d="M11 18h6" />
-  </g>
-  <circle cx="23" cy="23" r="7" fill="#ffffff" />
+  <defs>
+    <linearGradient id="hex" x1="10" y1="6" x2="54" y2="58" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4d8eff" />
+      <stop offset="0.45" stop-color="#0068F8" />
+      <stop offset="1" stop-color="#0044b4" />
+    </linearGradient>
+  </defs>
+
+  <!-- 六边形底座：同色描边 + round 连接，得到圆角 -->
   <path
-    d="M20.2 23.1l2.1 2.1 3.6-3.6"
-    fill="none"
-    stroke="#2f6097"
-    stroke-width="2.2"
-    stroke-linecap="round"
+    d="M32 2 5 16v32l27 14 27-14V16Z"
+    fill="url(#hex)"
+    stroke="url(#hex)"
+    stroke-width="6"
     stroke-linejoin="round"
   />
+
+  <!-- 白色盾牌 -->
+  <path
+    d="M32 11.5c4.9 2 9.6 2.9 13.4 3.1v17.6c0 8.6-5.6 14.9-13.4 18.9-7.8-4-13.4-10.3-13.4-18.9V14.6c3.8-.2 8.5-1.1 13.4-3.1Z"
+    fill="#ffffff"
+  />
+
+  <!-- 文档 + 折角 -->
+  <path
+    d="M24 17h10.5L41 23.4V38a3 3 0 0 1-3 3H27a3 3 0 0 1-3-3V17Z"
+    fill="#0068F8"
+  />
+  <path d="M34.5 17 41 23.4h-6.5Z" fill="#8ab2ff" />
+
+  <!-- 文档白线 -->
+  <g fill="#ffffff">
+    <rect x="26.6" y="21.5" width="11" height="2.5" rx="1.25" />
+    <rect x="26.6" y="26" width="11" height="2.5" rx="1.25" />
+    <rect x="26.6" y="30.5" width="7" height="2.5" rx="1.25" />
+  </g>
+
+  <!-- 青绿对勾：先描一圈底色白，做出与下方图形的分隔 -->
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m38 34.5 5.5 5.5L56 27.5" stroke="#ffffff" stroke-width="11" />
+    <path d="m38 34.5 5.5 5.5L56 27.5" stroke="#26D5A8" stroke-width="7" />
+  </g>
 </svg>

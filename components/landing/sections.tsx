@@ -185,9 +185,12 @@ export function BeforeAfterSection() {
 }
 
 /**
- * 每条样例都带自己的状态，而不是整块统一用一个状态 ——
- * 「缺少检测报告」是问题（红），「证书临期」是待确认（橙），
- * 混在一起会让状态色失去含义（见 docs/DESIGN.md §2）。
+ * 每条样例都带自己的状态色，而不是整块统一 —— 「缺少检测报告」比「证书临期」更急，
+ * 混成一个颜色会让状态色失去含义（见 docs/DESIGN.md §2）。
+ *
+ * ⚠️ 这里的 status 只决定**圆点颜色**，不渲染成文字标签，
+ * 因此不存在「通过」被写成结论的风险；文字标签那条路在 StatusPill 上，
+ * 由 tests/unit/brand-assets.test.ts 守着。
  */
 /**
  * 五个维度的「典型情况」。
@@ -199,7 +202,7 @@ const CAPABILITIES: ReadonlyArray<{
   title: string;
   category: FindingCategory;
   detail: string;
-  samples: readonly { text: string; status: "pass" | "warn" | "fail" }[];
+  samples: readonly { text: string; status: "fail" | "warn" }[];
 }> = [
   {
     title: "资料完整性",
@@ -269,11 +272,19 @@ function buildCheckGroups() {
  */
 export function CapabilitiesSection() {
   const checkGroups = buildCheckGroups();
-  /** 示意的“本次结论”：五个维度分别有事没事。刻意不统一成一个颜色。 */
-  const demoStatus = ["fail", "warn", "warn", "warn", "pass"] as const;
+  /**
+   * 示意的"本次结果"：五个维度分别有没有查出要看的点。
+   * 刻意不统一成一个颜色 —— 五个维度同时全绿反而说明图是画出来的。
+   * 取值用 clear/review/action（"有无发现"），不是 pass/fail（"是否合格"）。
+   */
+  const demoStatus = ["action", "review", "review", "review", "clear"] as const;
 
   return (
-    <section aria-labelledby="capabilities-heading" className="border-b border-ink-200 bg-white">
+    <section
+      id="capabilities"
+      aria-labelledby="capabilities-heading"
+      className="scroll-mt-16 border-b border-ink-200 bg-white"
+    >
       <div className="mx-auto w-full max-w-6xl px-6 py-24 lg:py-28">
         <div className="grid items-center gap-14 lg:grid-cols-2 lg:gap-12">
           {/* 左 50%：CheckFanout 视觉（弥散光背板） */}
@@ -338,13 +349,14 @@ export function CapabilitiesSection() {
                     <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5">
                       {item.samples.map((sample) => (
                         <li key={sample.text} className="flex items-center gap-1.5 text-xs text-ink-500">
+                          {/*
+                            只有两种色：danger / warning。
+                            原来还有个 success 绿的分支，但没有任何一条 sample 会走到它，
+                            是死代码 —— 而且绿色圆点会被读成"这一项通过了"。
+                          */}
                           <span
                             className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                              sample.status === "fail"
-                                ? "bg-danger-600"
-                                : sample.status === "warn"
-                                  ? "bg-warning-600"
-                                  : "bg-success-600"
+                              sample.status === "fail" ? "bg-danger-600" : "bg-warning-600"
                             }`}
                             aria-hidden="true"
                           />
@@ -406,8 +418,9 @@ export function RulesSection() {
 
   return (
     <section
+      id="rules"
       aria-labelledby="rules-heading"
-      className="bg-brand-900 py-24 pb-28 lg:py-28 lg:pb-32"
+      className="scroll-mt-16 bg-brand-900 py-24 pb-28 lg:py-28 lg:pb-32"
     >
       <div className="mx-auto w-full max-w-6xl px-6">
         <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-medium text-brand-100">
@@ -437,11 +450,18 @@ export function RulesSection() {
           <RuleEvidenceFinding dark />
         </div>
 
-        <div className="mt-10 grid gap-6 lg:grid-cols-2">
+        {/*
+          这里刻意**不用 grid**：五个维度的规则条数是 3 / 5 / 3 / 1 / 3，
+          grid 两列是"行等高"的 —— 1 条那张会被拉到旁边 3 条的高度，
+          底部留出一大片空壳；末行还会空掉半列（实测截图上一眼就能看出来）。
+          CSS 多列是"列内堆叠"，卡片各按内容高度排，两列总高自动接近。
+          维度之间没有先后依赖，列优先阅读不影响语义。
+        */}
+        <div className="mt-10 gap-6 lg:columns-2 [&>*:last-child]:mb-0">
           {groups.map((group) => (
             <div
               key={group.category}
-              className="rounded-lg border border-white/10 bg-white/5 p-5 transition-all duration-200 hover:-translate-y-1 hover:border-white/20 hover:bg-white/10"
+              className="mb-6 break-inside-avoid rounded-lg border border-white/10 bg-white/5 p-5 transition-all duration-200 hover:-translate-y-1 hover:border-white/20 hover:bg-white/10"
             >
               <div className="flex items-baseline justify-between gap-3">
                 <span className="flex items-center gap-2.5">
@@ -670,7 +690,11 @@ function WorkflowSnippet({ snippet }: { snippet: (typeof WORKFLOW)[number]["snip
  */
 export function WorkflowSection() {
   return (
-    <section aria-labelledby="workflow-heading" className="border-b border-ink-200 bg-white">
+    <section
+      id="workflow"
+      aria-labelledby="workflow-heading"
+      className="scroll-mt-16 border-b border-ink-200 bg-white"
+    >
       <div className="mx-auto w-full max-w-6xl px-6 py-16 lg:py-24">
         <Reveal>
           <h2 id="workflow-heading" className="text-2xl font-semibold tracking-tight text-ink-900">
@@ -844,8 +868,12 @@ export function SecuritySection() {
           深/浅的空间跳跃让这一屏在整页节奏里重新起一拍 ——
           更重要的是，把"做到了什么"和"没做到什么"并排放，读者一眼能对齐。
         */}
+        {/*
+          min-w-0：grid item 默认 min-width:auto，窄屏单列时会被内容的 min-content
+          顶开轨道宽度，再被祖先的 overflow-hidden 裁掉（见 report-section 同处注释）。
+        */}
         <div className="mt-12 grid gap-6 lg:grid-cols-5 lg:gap-8">
-          <Reveal className="lg:col-span-2">
+          <Reveal className="min-w-0 lg:col-span-2">
             <div className="h-full rounded-2xl bg-brand-900 p-6 text-white lg:p-7">
               <h3 className="text-base font-semibold text-white">先说清楚没做到的</h3>
               <ul className="mt-5 space-y-5">
@@ -868,7 +896,7 @@ export function SecuritySection() {
           </Reveal>
 
           {/* 只陈述已实现的机制。未取得认证就不写认证 —— 见 docs/DESIGN.md §0 硬规则 2 */}
-          <Reveal className="lg:col-span-3" delayMs={120}>
+          <Reveal className="min-w-0 lg:col-span-3" delayMs={120}>
             <ul className="grid h-full gap-4 sm:grid-cols-2">
               {SECURITY_ITEMS.map((item) => (
                 <li key={item.title} className="card flex gap-3 p-4">

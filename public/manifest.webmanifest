@@ -1,13 +1,13 @@
 {
-  "name": "供应商资料智能审核系统",
-  "short_name": "供应商智审",
+  "name": "企业供应商智能审核平台",
+  "short_name": "企智审",
   "description": "上传供应商资料，自动核对资料完整性、证照有效期与主体一致性。",
   "lang": "zh-CN",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#2f6097",
+  "theme_color": "#0068F8",
   "icons": [
     {
       "src": "/icon-192.png",

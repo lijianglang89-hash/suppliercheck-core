@@ -1,87 +1,56 @@
+import Image from "next/image";
+
 import { siteConfig } from "@/lib/site";
 
 /**
- * 品牌标识。
+ * 品牌标识（2026-09-28 起改用设计稿）。
  *
- * 图形 = 一份文件 + 右下角「判定徽章」。
+ * 图形来自 `docs/brand/logo-source-企智审.png`（James 设计），
+ * 由 `scripts/brand/make-logo-assets.py` 抠成透明底：
+ * 六边形底 + 白色盾牌 + 文档 + 青绿对勾 —— 「资料经核对后判定」这件事，一眼可读。
  *
- * 为什么不是盾牌：盾牌讲的是"安全"，而这个产品讲的是"逐条核对后给出可追溯的判定"。
- * 盾牌在 B2B 里已经被用滥到失去识别度了；文件 + 勾的组合同时命中
- * 资料（文件）与结论（判定）两件事，缩到 16px 也还能看出是个带勾的文件。
- *
- * 描边风格与 `components/ui/icons.tsx` 同源（2px、圆角端点），
- * 所以 logo 和界面图标放在一起不会像两套东西。
+ * ⚠️ 两点纪律：
+ * 1. **不要手改 public/brand 下的 PNG。** 它们是脚本产物，改源图或脚本再重跑，
+ *    否则脚本与产物静默失同步（这条在示例 PDF 上付过学费）。
+ * 2. **不再有拉丁名。** 产品服务国内客户，对客物料全中文（见 lib/site.ts 说明）。
  */
-export function LogoMark({
-  className = "h-8 w-8",
-  inverse = false,
-}: {
-  className?: string;
-  /** 深底反白：徽章底变白、勾变蓝，避免在深底色上出现"白圆白勾"。 */
-  inverse?: boolean;
-}) {
+export function LogoMark({ className = "h-9 w-9" }: { className?: string }) {
   return (
-    <svg
-      viewBox="0 0 32 32"
-      className={className}
-      role="img"
-      aria-label={`${siteConfig.name} 标识`}
-    >
-      <g
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M7.5 5h8l4 4v18h-12z" />
-        <path d="M15.5 5v4h4" />
-        <path d="M11 14h6" />
-        <path d="M11 18h6" />
-      </g>
-      <circle cx="23" cy="23" r="7" fill={inverse ? "#ffffff" : "currentColor"} />
-      <path
-        d="M20.2 23.1l2.1 2.1 3.6-3.6"
-        fill="none"
-        stroke={inverse ? "#2f6097" : "#ffffff"}
-        strokeWidth="2.2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
+    <Image
+      src="/brand/mark-transparent-512.png"
+      alt=""
+      width={512}
+      height={512}
+      className={`shrink-0 object-contain ${className}`}
+      priority
+      aria-hidden="true"
+    />
   );
 }
 
 /**
- * 横版字标：图形 + 中文简称 + 拉丁名。
+ * 横版字标：图形 + 简称；可选在下方补全称。
  *
- * 拉丁名不参与主视觉（`text-ink-400`）：对外传播一律用中文，
- * 拉丁名只用于技术场景（域名、代码、英文材料）—— 主次不能颠倒。
+ * 简称在上、全称在下 —— 简称便于记忆，全称保证「企业供应商智能审核平台」
+ * 这个搜索词在页面上真实出现过（SEO 与 GEO 都要求实体名称稳定且可检索）。
  */
 export function LogoLockup({
   className = "",
-  inverse = false,
-  withLatin = true,
+  withFullName = true,
 }: {
   className?: string;
-  inverse?: boolean;
-  withLatin?: boolean;
+  /** 导航或页脚空间紧张时可关掉全称。 */
+  withFullName?: boolean;
 }) {
   return (
     <span className={`flex items-center gap-2.5 ${className}`}>
-      <LogoMark className="h-9 w-9 shrink-0" inverse={inverse} />
+      <LogoMark className="h-9 w-9" />
       <span className="flex flex-col leading-none">
-        <span
-          className={`text-[15px] font-semibold tracking-tight ${
-            inverse ? "text-white" : "text-ink-900"
-          }`}
-        >
+        <span className="text-[15px] font-semibold tracking-tight text-ink-900">
           {siteConfig.shortName}
         </span>
-        {withLatin ? (
-          <span className={`mt-1 text-[10px] tracking-wide ${inverse ? "text-brand-200" : "text-ink-400"}`}>
-            {siteConfig.latinName}
-          </span>
+        {withFullName ? (
+          <span className="mt-1 text-[10px] tracking-wide text-ink-400">{siteConfig.name}</span>
         ) : null}
       </span>
     </span>

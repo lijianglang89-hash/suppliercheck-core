@@ -241,7 +241,7 @@ export default async function ReportPage({
 
         <footer className="mt-6 border-t border-ink-200 pt-4 text-xs leading-relaxed text-ink-500">
           <p>
-            本报告由 {siteConfig.name}（{siteConfig.latinName}）自动生成。
+            本报告由 {siteConfig.name}自动生成。
             全部结论来自确定性规则引擎
             {run.engineMock ? "；AI 复核未启用（当前为开发模拟 Provider，不产生真实判断）" : "，并经 AI 复核"}。
           </p>

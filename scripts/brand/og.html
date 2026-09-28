@@ -19,7 +19,7 @@
 <html lang="zh-CN">
   <head>
     <meta charset="utf-8" />
-    <title>OG · 供应商智审</title>
+    <title>OG · 企智审</title>
     <style>
       * {
         margin: 0;
@@ -79,10 +79,16 @@
         letter-spacing: -0.2px;
         color: #161a21;
       }
-      .brand-latin {
+      .lockup-mark {
+        display: block;
+        width: 44px;
+        height: 44px;
+      }
+      .brand-full {
         margin-top: 5px;
-        font-size: 11px;
-        letter-spacing: 2.4px;
+        font-size: 12px;
+        /* 中文不用 uppercase / 大字距：那是拉丁小字的排版手法，套到汉字上就是散架 */
+        letter-spacing: 0.5px;
         color: #9aa2ad;
       }
       .domain {
@@ -106,10 +112,10 @@
         align-items: center;
         gap: 8px;
         padding: 6px 12px;
-        border: 1px solid #c5d9ee;
+        border: 1px solid #b8d0ff;
         border-radius: 999px;
-        background: #f2f6fb;
-        color: #274e7b;
+        background: #eef3ff;
+        color: #004bb5;
         font-size: 14px;
         font-weight: 500;
       }
@@ -123,7 +129,7 @@
       }
       h1 em {
         font-style: normal;
-        color: #2f6097;
+        color: #0068F8;
       }
       .lede {
         margin-top: 20px;
@@ -152,7 +158,7 @@
         width: 7px;
         height: 7px;
         border-radius: 999px;
-        background: #2f6097;
+        background: #0068F8;
       }
 
       /* 右侧：产品界面示意（.card 语言：白底 + 细边框 + 投影） */
@@ -163,7 +169,7 @@
         border: 1px solid #e2e5e9;
         border-radius: 14px;
         background: #ffffff;
-        box-shadow: 0 16px 40px rgba(23, 44, 70, 0.1);
+        box-shadow: 0 16px 40px rgba(0, 32, 80, 0.1);
         padding: 18px;
       }
       .panel-head {
@@ -202,8 +208,8 @@
       .ext {
         padding: 2px 5px;
         border-radius: 4px;
-        background: rgba(47, 96, 151, 0.1);
-        color: #2f6097;
+        background: rgba(0, 104, 248, 0.1);
+        color: #0068F8;
         font-size: 10px;
         font-weight: 700;
         letter-spacing: 0.4px;
@@ -246,39 +252,26 @@
         font-size: 12px;
         font-weight: 500;
       }
-      .pill-pass {
-        background: rgba(31, 122, 77, 0.1);
-        color: #1f7a4d;
+      /*
+        严重级别徽标 —— 取值与 lib/reviews/labels.ts 的 SEVERITY_BADGE_CLASS 同源。
+        改那边的色值时，这里必须跟着改，否则分享图与报告页会对不上。
+        （来源标注写在这里，是因为分享图没有编译期类型可依赖。）
+      */
+      .sev-critical {
+        background: rgba(185, 28, 28, 0.1);
+        color: #b91c1c;
       }
-      .pill-warn {
-        background: rgba(163, 90, 6, 0.1);
-        color: #a35a06;
+      .sev-high {
+        background: rgba(194, 65, 12, 0.1);
+        color: #c2410c;
       }
-      .pill-fail {
-        background: rgba(179, 38, 30, 0.1);
-        color: #b3261e;
+      .sev-medium {
+        background: rgba(146, 64, 14, 0.1);
+        color: #92400e;
       }
-      .sev {
-        margin-top: 14px;
-      }
-      .sev-head {
-        display: flex;
-        align-items: baseline;
-        justify-content: space-between;
-        font-size: 12px;
-        color: #363d49;
-      }
-      .sev-legend {
-        font-size: 11px;
-        color: #9aa2ad;
-      }
-      .sev-bar {
-        margin-top: 7px;
-        display: flex;
-        height: 8px;
-        border-radius: 999px;
-        overflow: hidden;
-        background: #eef0f2;
+      .sev-low {
+        background: rgba(3, 105, 161, 0.1);
+        color: #0369a1;
       }
       .panel-foot {
         margin-top: 12px;
@@ -311,7 +304,7 @@
       }
       .boundary {
         padding-left: 12px;
-        border-left: 2px solid #9bbde0;
+        border-left: 2px solid #8ab2ff;
         font-size: 14px;
         color: #6b7482;
       }
@@ -323,20 +316,16 @@
 
       <div class="top">
         <div class="lockup">
-          <!-- 品牌标识：文件 + 判定徽章（与 components/brand/logo.tsx 同一图形） -->
-          <svg width="44" height="44" viewBox="0 0 32 32" aria-hidden="true">
-            <g fill="none" stroke="#2f6097" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M7.5 5h8l4 4v18h-12z" />
-              <path d="M15.5 5v4h4" />
-              <path d="M11 14h6" />
-              <path d="M11 18h6" />
-            </g>
-            <circle cx="23" cy="23" r="7" fill="#2f6097" />
-            <path d="M20.2 23.1l2.1 2.1 3.6-3.6" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
+          <!--
+            品牌标识由生成脚本注入（`{{MARK}}` 占位符被替换成 public/brand/mark-transparent-512.png 的 data URI）。
+            ⚠️ **不要再在这里手写一段 SVG。** 曾经这里、app/icon.svg、components/brand/logo.tsx
+            各有一份"同一图形"的手写副本 —— 换品牌时三份全过期，而分享图上那条不会有人手动去核。
+            现在图形只有一个真源：docs/brand/logo-source-企智审.png → scripts/brand/make-logo-assets.py。
+          -->
+          <img class="lockup-mark" src="{{MARK}}" alt="" width="44" height="44" />
           <div class="lockup-text">
-            <span class="brand-name">供应商智审</span>
-            <span class="brand-latin">SUPPLIERCHECK</span>
+            <span class="brand-name">企智审</span>
+            <span class="brand-full">企业供应商智能审核平台</span>
           </div>
         </div>
         <div class="domain">supplier.ultron.xin</div>
@@ -345,7 +334,7 @@
       <div class="body">
         <div class="left">
           <div class="kicker">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#274e7b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#004bb5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M14 3v5h5" />
               <path d="M19 8v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7z" />
               <path d="M9 15l2 2 4-4" />
@@ -380,44 +369,39 @@
 
           <div class="rule-count">15 条规则逐条核对</div>
 
+          <!--
+            这一列**只有发现，没有"通过"行**。
+            系统只在规则命中时产出发现，从不产出"某份资料已通过"的正面结论 ——
+            分享图上画一行"通过"，等于替系统宣布一件它从不宣布的事。
+            严重级别用真实标签（严重 / 高 / 中 / 低），取值来自 lib/reviews/labels.ts。
+          -->
           <div class="rows">
             <div class="row">
-              <span class="dot" style="background: #1f7a4d"></span>
-              <span class="row-label">营业执照在有效期内</span>
-              <span class="pill pill-pass">通过</span>
+              <span class="dot" style="background: #dc2626"></span>
+              <span class="row-label">证照已过期：ISO9001 证书.pdf</span>
+              <span class="pill sev-critical">严重</span>
             </div>
             <div class="row">
-              <span class="dot" style="background: #a35a06"></span>
-              <span class="row-label">ISO9001 证书 42 天后到期</span>
-              <span class="pill pill-warn">待确认</span>
+              <span class="dot" style="background: #ea580c"></span>
+              <span class="row-label">证照即将到期：ISO14001 证书.pdf</span>
+              <span class="pill sev-high">高</span>
             </div>
             <div class="row">
-              <span class="dot" style="background: #b3261e"></span>
-              <span class="row-label">资料包中未找到检测报告</span>
-              <span class="pill pill-fail">问题</span>
+              <span class="dot" style="background: #ea580c"></span>
+              <span class="row-label">必备资料缺失：检测报告</span>
+              <span class="pill sev-high">高</span>
             </div>
             <div class="row">
-              <span class="dot" style="background: #a35a06"></span>
-              <span class="row-label">开户资料主体名称不一致</span>
-              <span class="pill pill-warn">待确认</span>
+              <span class="dot" style="background: #0284c7"></span>
+              <span class="row-label">有效期无法判定：报价单.xlsx</span>
+              <span class="pill sev-low">低</span>
             </div>
           </div>
 
-          <!-- 严重度分布条：与 components/ui/severity-bar.tsx 同一套语义色 -->
-          <div class="sev">
-            <div class="sev-head">
-              <span>严重度分布</span>
-              <span class="sev-legend">严重 1 · 高 1 · 中 2 · 提示 3</span>
-            </div>
-            <div class="sev-bar">
-              <i style="width: 14%; background: #ef4444"></i>
-              <i style="width: 14%; background: #f97316"></i>
-              <i style="width: 29%; background: #fbbf24"></i>
-              <i style="width: 43%; background: #38bdf8"></i>
-            </div>
-          </div>
-
-          <p class="panel-foot">以上为界面示意，公司名与发现条数均为示例，不代表任何真实审核结果。</p>
+          <p class="panel-foot">
+            每条发现都带规则编号、所在资料与原文摘录。
+            以上为界面示意，公司名与发现均为示例，不代表任何真实审核结果。
+          </p>
         </div>
       </div>
 
