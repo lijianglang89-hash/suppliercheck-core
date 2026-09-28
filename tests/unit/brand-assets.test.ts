@@ -169,3 +169,28 @@ describe("品牌资产文件", () => {
     expect(buffer.readUInt32BE(20)).toBe(180);
   });
 });
+
+describe("served SVG 必须是合法 XML（浏览器按严格 XML 解析 image/svg+xml）", () => {
+  // 2026-09-28 事故：icon.svg 的注释里写了「--color-brand-600」——
+  // XML 注释内部不允许出现连续连字符，整个文件解析失败，
+  // 浏览器标签页图标渲染不出来（裂图或静默回退 ico）。
+  // 渲染端（librsvg / 浏览器 XML 解析）都会拒绝，这里双保险钉死。
+  it("app/icon.svg 能被严格 XML 解析器解析", async () => {
+    const { SaxesParser } = await import("saxes");
+    const xml = await readFile(path.resolve(ROOT, "app/icon.svg"), "utf8");
+    const parser = new SaxesParser({ xmlns: false, position: false });
+    const errors: string[] = [];
+    parser.on("error", (e: Error) => errors.push(e.message));
+    parser.write(xml).close();
+    expect(errors).toEqual([]);
+  });
+
+  it("app/icon.svg 注释内部不含「--」（XML 注释的硬性禁令）", async () => {
+    const xml = await readFile(path.resolve(ROOT, "app/icon.svg"), "utf8");
+    const comments = xml.match(/<!--[\s\S]*?-->/g) ?? [];
+    expect(comments.length).toBeGreaterThan(0);
+    for (const comment of comments) {
+      expect(comment.slice(4, -3)).not.toMatch(/--/);
+    }
+  });
+});
