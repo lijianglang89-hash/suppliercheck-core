@@ -247,4 +247,43 @@ describe("审核工作流端到端（真实数据库）", () => {
       .where(and(eq(reviewRuns.workspaceId, wsB.id), eq(reviewRuns.id, run.id)));
     expect(leakRuns).toHaveLength(0);
   });
+
+  /**
+   * ★ READY 门禁（探针 #2 修复的回归钉）：解析未完成的资料不能被拉进审核。
+   *
+   * 引擎对文本缺失的资料是宽容的（只记 note 不报错），但宽容产出的是
+   * 「看起来跑完、实际什么都没查」的幽灵报告 —— 门禁在创建时就把这条路堵死。
+   * 三个非就绪状态各验一次；软删除资料走的是另一条 notFound 分支
+   * （document-access-boundary.test.ts 已钉），这里不重复。
+   */
+  it("★ UPLOADED / PROCESSING / FAILED 的资料发起审核一律被 409 拒绝", async () => {
+    const user = await createTestUser("gate");
+    createdUserIds.push(user.id);
+    const workspace = await createTestWorkspace(user.id, "门禁工作区");
+
+    for (const status of ["UPLOADED", "PROCESSING", "FAILED"] as const) {
+      const doc = await uploadFixture(workspace.id, user.id);
+      if (status !== "UPLOADED") {
+        await getDb().update(documents).set({ status }).where(eq(documents.id, doc.id));
+      }
+
+      await expect(
+        createReviewRunAndEnqueue({
+          workspaceId: workspace.id,
+          userId: user.id,
+          templateKey: "builtin:supplier-onboarding",
+          documentIds: [doc.id],
+          supplierId: null,
+          name: null,
+        }),
+      ).rejects.toThrow(/尚未完成解析/);
+    }
+
+    // 门禁拦下的请求不能留下任何 run —— 连「建了再失败」都不允许
+    const runs = await getDb()
+      .select()
+      .from(reviewRuns)
+      .where(eq(reviewRuns.workspaceId, workspace.id));
+    expect(runs).toHaveLength(0);
+  });
 });

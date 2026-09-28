@@ -98,6 +98,16 @@ export async function createReviewRunAndEnqueue(params: CreateReviewRunParams): 
     throw errors.notFound("部分资料不存在或不属于当前工作区，请刷新页面后重试。");
   }
 
+  // ★ READY 门禁：只允许对「解析完成」的资料发起审核。
+  // 引擎对文本缺失的资料是宽容的（engine 会记「N 份资料尚未完成解析，未参与本次审核」），
+  // 但宽容在这里是错的：对 UPLOADED/PROCESSING/FAILED 的资料发起审核，
+  // 产出的是一份看起来跑完、实际什么都没查的「幽灵报告」——
+  // 与其让使用者拿到误导性结论，不如在这一步就明确拒绝，等解析完成。
+  const notReady = rows.filter((row) => row.status !== "READY");
+  if (notReady.length > 0) {
+    throw errors.conflict("部分资料尚未完成解析（或解析失败），请等资料就绪后再发起审核。");
+  }
+
   const provider = getAIProvider();
   const name = buildRunName(params.name, supplierName, template.name, rows);
 
