@@ -1,0 +1,95 @@
+# ============================================================================
+# 供应商智审 SupplierCheck · CI
+#
+# 两个 job，刻意分开：
+#   unit        —— typecheck + 单元测试。不需要数据库，秒级反馈，先跑先红。
+#   integration —— 四道集成守卫（下载契约 / 迁移回归 / READY 门禁 / GC 契约），
+#                  连真实 Postgres 跑。依赖 unit 通过，避免白等数据库起完才发现类型错。
+#
+# 关键事实（都是实测，别凭直觉改）：
+# 1. 集成测试必须先执行 `npm run db:migrate`。migration-regression 探针虽然
+#    自带幂等 migrate()，但 vitest 按文件名字母序执行，排在它前面的
+#    archive-expansion / document-gc 等文件需要表已经存在 —— 全新库会假红。
+# 2. Postgres 用 16-alpine，与 docker-compose.yml 和生产部署同版本。
+#    迁移回归探针验证的是「迁移文件 → 物理结构」的映射，版本不同测的不是部署那套。
+# 3. tests/setup.ts 按 .env.test > .env.local > .env 的顺序加载环境文件，
+#    CI 里这些文件都不存在，因此一切依赖 job/env 级注入的环境变量。
+#    SESSION_SECRET 是 CI 专用的非生产值（签名单测只需 ≥32 字符），不入 GitHub Secrets。
+# 4. vitest 配置已固定 fileParallelism: false（集成测试串行），服务容器无需调优。
+# ============================================================================
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: Typecheck + Unit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npx vitest run tests/unit
+
+  integration:
+    name: Integration (real Postgres)
+    runs-on: ubuntu-latest
+    needs: [unit]
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: suppliercheck
+          POSTGRES_PASSWORD: suppliercheck
+          POSTGRES_DB: suppliercheck
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U suppliercheck -d suppliercheck"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # 服务容器地址写死 127.0.0.1，不依赖宿主名解析。
+      DATABASE_URL: postgresql://suppliercheck:suppliercheck@127.0.0.1:5432/suppliercheck
+      # CI 专用测试值（非机密）：parseServerEnv 要求 ≥32 字符，签名类单测依赖它。
+      SESSION_SECRET: ci-only-session-secret-0123456789abcdef0123456789abcdef
+      LOG_LEVEL: warn
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # 必须在集成测试之前：集成文件按字母序执行，多数文件要求表已存在。
+      - name: Run database migrations
+        run: npm run db:migrate
+
+      - name: Integration tests
+        run: npx vitest run tests/integration
