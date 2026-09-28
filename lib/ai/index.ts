@@ -9,16 +9,29 @@ import { getEnv } from "@/lib/config/server-env";
 import { errors } from "@/lib/errors";
 
 import { MockAIProvider } from "./providers/mock";
+import { OpenAICompatibleProvider } from "./providers/openai-compatible";
 import type { AIProvider } from "./types";
 
 type ProviderFactory = (options: { apiKey?: string; model?: string; baseUrl?: string }) => AIProvider;
 
 /**
- * 未来接入 OpenAI-compatible 服务（百炼 / DeepSeek / Kimi / OpenAI）时，
- * 在这里注册工厂函数即可 —— 前提是 provider id 已加入 schema.ts 的 AI_PROVIDER_IDS。
+ * provider id 已在 lib/config/schema.ts 的 AI_PROVIDER_IDS 里注册。
+ * 新增供应商时：加 id → 加工厂函数，调用方代码零改动。
  */
 const PROVIDER_FACTORIES: Partial<Record<string, ProviderFactory>> = {
   mock: () => new MockAIProvider(),
+  "openai-compatible": (options) => {
+    if (!options.apiKey || options.apiKey.trim().length === 0) {
+      throw errors.configuration(
+        'AI_PROVIDER="openai-compatible" 需要配置 AI_API_KEY（以及建议配置 AI_MODEL / AI_BASE_URL）。',
+      );
+    }
+    return new OpenAICompatibleProvider({
+      apiKey: options.apiKey,
+      model: options.model,
+      baseUrl: options.baseUrl,
+    });
+  },
 };
 
 let cached: AIProvider | undefined;
