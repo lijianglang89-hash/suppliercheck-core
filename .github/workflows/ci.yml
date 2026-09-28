@@ -43,6 +43,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # tsc 依赖 Next.js 生成的类型（next-env.d.ts 引用的 .next/types 路由类型，
+      # LayoutProps / PageProps 都在那里）。两者都是构建产物、被 gitignore，
+      # 全新 checkout 里不存在 —— 首跑实测：不加这步，Typecheck 直接 TS2304。
+      - name: Generate Next.js route types
+        run: npx next typegen
+
       - name: Typecheck
         run: npm run typecheck
 
