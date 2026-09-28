@@ -6,28 +6,10 @@ import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
 import { cleanupUsers, createTestUser } from "../helpers/fixtures";
-
-/**
- * 现有业务表（2026-09-28 实测核对后的清单，不再是「需求第八条」的照抄）。
- *
- * ⚠️ 原本这里列的是需求文档里的 12 张表，其中 7 张（questionnaires / questions /
- * evidence / answers / answer_reviews / audit_reports / exports）**从未有任何代码使用** ——
- * 它们唯一的使用者就是下面这条「表都存在」的断言，等于用测试给空壳发合格证。
- * 已随迁移删除（生产库实测 0 行，无数据损失）。
- *
- * 教训：把「需求列了」当成「已交付」写进断言，会让不存在的功能在 CI 里长期显示绿色。
- */
-const EXPECTED_TABLES = [
-  "users",
-  "workspaces",
-  "workspace_members",
-  "documents",
-  "document_processing_jobs",
-  "suppliers",
-  "review_templates",
-  "review_runs",
-  "review_findings",
-] as const;
+// 表清单的唯一事实源在 helpers/expected-tables.ts（0.4.17 起：实测清单，不是需求照抄；
+// 7 张零使用的孤儿表已随迁移删除）。本文件只做「期望表都存在」的单向断言；
+// 反方向（多出来的表）由 migration-regression.test.ts 的集合相等断言守住。
+import { EXPECTED_TABLES } from "../helpers/expected-tables";
 
 const createdUserIds: string[] = [];
 
