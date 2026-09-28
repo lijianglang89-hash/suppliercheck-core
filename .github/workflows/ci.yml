@@ -28,6 +28,15 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# workflow 级注入：CI 里不存在任何 .env* 文件，而部分单测（审核引擎 → AI provider）
+# 会触达 getEnv() 的 zod 校验 —— 没有这两个值连单测都起不来（首跑实测 71 个假红）。
+# unit job 不会真的连数据库，DATABASE_URL 只是让环境校验通过。
+env:
+  DATABASE_URL: postgresql://suppliercheck:suppliercheck@127.0.0.1:5432/suppliercheck
+  # CI 专用测试值（非机密）：parseServerEnv 要求 ≥32 字符。不入 GitHub Secrets。
+  SESSION_SECRET: ci-only-session-secret-0123456789abcdef0123456789abcdef
+  LOG_LEVEL: warn
+
 jobs:
   unit:
     name: Typecheck + Unit
@@ -78,9 +87,6 @@ jobs:
     env:
       # 服务容器地址写死 127.0.0.1，不依赖宿主名解析。
       DATABASE_URL: postgresql://suppliercheck:suppliercheck@127.0.0.1:5432/suppliercheck
-      # CI 专用测试值（非机密）：parseServerEnv 要求 ≥32 字符，签名类单测依赖它。
-      SESSION_SECRET: ci-only-session-secret-0123456789abcdef0123456789abcdef
-      LOG_LEVEL: warn
 
     steps:
       - uses: actions/checkout@v4
