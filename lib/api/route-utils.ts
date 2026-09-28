@@ -28,9 +28,18 @@ export function errorResponse(error: unknown, requestId?: string): NextResponse 
     logger.warn("接口拒绝请求", context);
   }
 
+  const headers: Record<string, string> = { "Cache-Control": "no-store, max-age=0" };
+
+  // 限流拒绝时带上 Retry-After：让客户端（和人）知道什么时候可以再来，
+  // 而不是对着 429 干等。标准头，网关与浏览器都认。
+  const retryAfter = appError.details.retryAfterSeconds;
+  if (appError.status === 429 && typeof retryAfter === "number") {
+    headers["Retry-After"] = String(Math.max(1, Math.ceil(retryAfter)));
+  }
+
   return NextResponse.json(appError.toResponseBody(), {
     status: appError.status,
-    headers: { "Cache-Control": "no-store, max-age=0" },
+    headers,
   });
 }
 

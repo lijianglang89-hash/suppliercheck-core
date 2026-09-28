@@ -16,6 +16,7 @@ import { isUuid } from "@/lib/files";
 import { findDocumentById } from "@/lib/documents/repository";
 import { enqueueDocumentProcessing } from "@/lib/documents/service";
 import { serializeDocument } from "@/lib/documents/serialize";
+import { enforceRateLimit } from "@/lib/rate-limit/policy";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,7 +29,7 @@ export async function POST(
 
   try {
     // 先要会话，再碰数据库：避免「未登录」的响应因 id 是否存在而不同（可枚举信号）。
-    await requireUser();
+    const user = await requireUser();
 
     const { documentId } = await context.params;
     if (!isUuid(documentId)) {
@@ -42,6 +43,9 @@ export async function POST(
 
     // 重新解析是「写」操作，要求 MEMBER 及以上，只读成员不能触发。
     await requireWorkspaceAccess(document.workspaceId, { minimumRole: "MEMBER", requestId });
+
+    // 授权之后、入队之前：重新解析与上传共用同一条串行队列，频次必须受控。
+    enforceRateLimit("reprocess", `${user.id}:${document.workspaceId}`);
 
     const result = await enqueueDocumentProcessing(documentId);
     const refreshed = (await findDocumentById(documentId)) ?? document;

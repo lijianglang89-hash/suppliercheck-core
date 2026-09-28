@@ -19,6 +19,7 @@ import { expandArchiveDocument, enqueueMany, storeUploadedFile } from "@/lib/doc
 import { receiveSingleFile } from "@/lib/documents/multipart";
 import { serializeDocument } from "@/lib/documents/serialize";
 import type { DocumentRow } from "@/lib/db/schema";
+import { enforceRateLimit } from "@/lib/rate-limit/policy";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,6 +37,10 @@ export async function POST(request: Request): Promise<Response> {
       minimumRole: "MEMBER",
       requestId,
     });
+
+    // 授权之后、收字节之前：被限流拒绝时一个字节都不落盘。
+    // key = 用户+工作区 —— 限的是「一个身份在一个工作区里的上传速率」。
+    enforceRateLimit("upload", `${user.id}:${workspace.id}`);
 
     const env = getEnv();
     let created: DocumentRow | undefined;

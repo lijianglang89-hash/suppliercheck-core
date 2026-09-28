@@ -16,6 +16,8 @@ export const ERROR_CODES = {
   // 资源类
   NOT_FOUND: "NOT_FOUND",
   CONFLICT: "CONFLICT",
+  // 频次类
+  RATE_LIMITED: "RATE_LIMITED",
   // 文件类
   FILE_TOO_LARGE: "FILE_TOO_LARGE",
   UNSUPPORTED_MEDIA_TYPE: "UNSUPPORTED_MEDIA_TYPE",
@@ -41,6 +43,7 @@ export type ErrorCategory =
   | "forbidden"
   | "not_found"
   | "conflict"
+  | "rate_limited"
   | "infra"
   | "internal";
 
@@ -50,6 +53,7 @@ const CATEGORY_BY_CODE: Record<ErrorCode, ErrorCategory> = {
   FORBIDDEN: "forbidden",
   NOT_FOUND: "not_found",
   CONFLICT: "conflict",
+  RATE_LIMITED: "rate_limited",
   FILE_TOO_LARGE: "input",
   UNSUPPORTED_MEDIA_TYPE: "input",
   UNSAFE_FILE_NAME: "input",
@@ -66,6 +70,7 @@ const HTTP_STATUS_BY_CATEGORY: Record<ErrorCategory, number> = {
   forbidden: 403,
   not_found: 404,
   conflict: 409,
+  rate_limited: 429,
   infra: 503,
   internal: 500,
 };
@@ -77,6 +82,7 @@ const USER_MESSAGE_BY_CODE: Record<ErrorCode, string> = {
   FORBIDDEN: "你没有访问该资源的权限。",
   NOT_FOUND: "没有找到对应的资源。",
   CONFLICT: "该资源已存在，请勿重复提交。",
+  RATE_LIMITED: "操作过于频繁，请稍等片刻再试。",
   FILE_TOO_LARGE: "文件超出大小限制，请压缩后重新上传。",
   UNSUPPORTED_MEDIA_TYPE: "不支持该文件类型。",
   UNSAFE_FILE_NAME: "文件名包含非法字符，请重命名后重新上传。",
@@ -174,6 +180,11 @@ export const errors = {
     new AppError(ERROR_CODES.NOT_FOUND, message, options),
   conflict: (message: string, options?: AppErrorOptions) =>
     new AppError(ERROR_CODES.CONFLICT, message, options),
+  /**
+   * 频次超限。details.retryAfterSeconds 会被 route-utils 转成 Retry-After 响应头。
+   */
+  rateLimited: (message: string, options?: AppErrorOptions) =>
+    new AppError(ERROR_CODES.RATE_LIMITED, message, options),
   fileTooLarge: (message: string, options?: AppErrorOptions) =>
     new AppError(ERROR_CODES.FILE_TOO_LARGE, message, options),
   unsupportedMediaType: (message: string, options?: AppErrorOptions) =>

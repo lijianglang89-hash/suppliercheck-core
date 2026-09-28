@@ -19,6 +19,7 @@ import { EMPTY_FORM_STATE, type FormState } from "@/lib/forms/form-state";
 import { toAppError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { MAX_RUN_NAME_CHARS } from "@/lib/reviews/limits";
+import { enforceRateLimit } from "@/lib/rate-limit/policy";
 import { findReviewRunById, softDeleteReviewRun } from "@/lib/reviews/repository";
 import { createReviewRunAndEnqueue, enqueueReviewRun } from "@/lib/reviews/service";
 
@@ -56,6 +57,9 @@ export async function createReviewAction(
   let runId: string;
   try {
     const { workspace, user } = await requireActionWorkspace("MEMBER");
+    // 审核是最重的一档资源消耗（引擎 + 串行队列 + 全量结论落库）。
+    // 授权之后、落库之前；超限时 RATE_LIMITED 的用户文案会出现在表单错误里。
+    enforceRateLimit("review", `${user.id}:${workspace.id}`);
     const run = await createReviewRunAndEnqueue({
       workspaceId: workspace.id,
       userId: user.id,
@@ -87,7 +91,9 @@ export async function rerunReviewAction(
 
   let message: string;
   try {
-    const { workspace } = await requireActionWorkspace("MEMBER");
+    const { workspace, user } = await requireActionWorkspace("MEMBER");
+    // rerun 与新建共用同一档限额：两者消耗的资源本质相同（串行队列里的引擎任务）。
+    enforceRateLimit("review", `${user.id}:${workspace.id}`);
     const run = await findReviewRunById(runId);
     if (!run || run.workspaceId !== workspace.id) {
       return { status: "error", error: "没有找到对应的审核任务。" };
