@@ -20,6 +20,15 @@ export const EXPECTED_TABLES = [
   "workspaces",
   "workspace_members",
   "documents",
+  /**
+   * ⚠️ 2026-09-29 CI 首跑实测补录：这里原本漏了 document_texts。
+   * 讽刺但正确 —— 探针 #3 的集合相等断言在全新库上抓到的第一个
+   * 「清单外物理表」就是清单自己漏掉的核心业务表（它有完整服务层：
+   * upsertDocumentText / findDocumentText，解析产物的落点）。
+   * 漏项成因：清单是按「删孤儿表后的 9 张」手抄的，没有回头对着
+   * lib/db/schema.ts 逐表核对。补上后 = 10 张，与 0.4.17 生产实测一致。
+   */
+  "document_texts",
   "document_processing_jobs",
   "suppliers",
   "review_templates",
