@@ -16,11 +16,15 @@ interface DashboardShellProps {
  * 站点名一律用**全称**（`siteConfig.name`），不用简称 ——
  * 侧栏是用户每天看到的第一屏，产品叫什么应该在这里说清楚。
  * 空间不够时换行，而不是偷偷把名字截短。
+ *
+ * 打印纪律：aside（导航/工作区信息）与 header（账号/退出按钮）是系统交互界面，
+ * 正式交付的报告绝不能带有这些残余 —— 两处都标 `print:hidden`，
+ * 打印时只剩 `<main>` 里的报告内容（报告页自身另有元素级 print:hidden）。
  */
 export function DashboardShell({ user, workspace, children }: DashboardShellProps) {
   return (
     <div className="flex min-h-screen flex-col lg:flex-row">
-      <aside className="border-b border-ink-200 bg-white lg:w-64 lg:shrink-0 lg:border-b-0 lg:border-r">
+      <aside className="border-b border-ink-200 bg-white print:hidden lg:w-64 lg:shrink-0 lg:border-b-0 lg:border-r">
         <div className="flex min-h-16 items-center border-b border-ink-100 px-5 py-3">
           <a href="/dashboard" className="flex items-center gap-2.5">
             <LogoMark className="h-7 w-7 shrink-0" />
@@ -45,7 +49,7 @@ export function DashboardShell({ user, workspace, children }: DashboardShellProp
       </aside>
 
       <div className="flex flex-1 flex-col">
-        <header className="sticky top-0 z-10 flex h-14 items-center justify-between gap-4 border-b border-ink-200 bg-white px-6">
+        <header className="sticky top-0 z-10 flex h-14 items-center justify-between gap-4 border-b border-ink-200 bg-white px-6 print:hidden">
           <Topbar workspaceName={workspace.name} />
 
           <div className="flex shrink-0 items-center gap-3">
